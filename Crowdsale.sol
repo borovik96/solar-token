@@ -7,8 +7,8 @@ contract Crowdsale is SOL{
     mapping(address => bool) whiteList;
     mapping(address => uint) weiBalances;
     address[] investors;
-    uint public remainedBountyTokens;
-    uint priceEthUSD = 85000;// cent
+    uint public remainedBountyTokens = 1893000;
+    uint priceEthUSD = 120000;// cent
     uint startTime;
     uint public currentStage = 0;
     uint8 lastSubStage = 3;
@@ -21,7 +21,7 @@ contract Crowdsale is SOL{
     }
     Stage[4] private icoStages;
     Stage[4] private preIcoStages;
-    uint public softCap = 100;
+    uint public softCap = 100;// general
     bool public outOfTokens = false;
 
     function () public payable{
@@ -63,18 +63,18 @@ contract Crowdsale is SOL{
         uint amount = paidWei.div(tokenWeiPrice);
         uint remainedTokensWeiPrice = (currentStageRemain.div(10 ** decimals)).mul(tokenWeiPrice);
         amount *= 10 ** decimals;
-        if(weiBalances[msg.sender] == 0 ) investors.push(msg.sender);
+        if(weiBalances[msg.sender] == 0) investors.push(msg.sender);
 
         if (currentStageRemain >= amount) {
             balances[msg.sender] = balances[msg.sender].add(amount);
             stages[currentStage].remainedTokens = currentStageRemain.sub(amount);
-            weiBalances[msg.sender] = weiBalances[msg.sender].add(paidWei);
+            if (isICO) weiBalances[msg.sender] = weiBalances[msg.sender].add(paidWei);
             updateStages(stages, isICO);
             totalSupply = totalSupply.sub(amount);
         } else if (currentStage == lastSubStage) {
             balances[msg.sender] = balances[msg.sender].add(currentStageRemain);
             stages[currentStage].remainedTokens = 0;
-            weiBalances[msg.sender] = weiBalances[msg.sender].add(remainedTokensWeiPrice);
+            if (isICO) weiBalances[msg.sender] = weiBalances[msg.sender].add(remainedTokensWeiPrice);
             updateStages(stages, isICO);
             totalSupply = totalSupply.sub(currentStageRemain);
             if (isICO) outOfTokens = true;
@@ -82,7 +82,7 @@ contract Crowdsale is SOL{
         } else {
             uint debt = paidWei.sub(remainedTokensWeiPrice); // wei
             balances[msg.sender] = balances[msg.sender].add(currentStageRemain);
-            weiBalances[msg.sender] = weiBalances[msg.sender].add(remainedTokensWeiPrice);
+            if (isICO) weiBalances[msg.sender] = weiBalances[msg.sender].add(remainedTokensWeiPrice);
             totalSupply = totalSupply.sub(currentStageRemain);
             stages[currentStage].remainedTokens = 0;
             updateStages(stages, isICO);
@@ -117,18 +117,24 @@ contract Crowdsale is SOL{
     }
 
     function Crowdsale() public {
-        startTime = now;
+        startTime = 1522713600;
         totalSupply = initialSupply;
         // PreICO 0-3
-        preIcoStages[0] = Stage(startTime, startTime + 1 weeks, 10, 1000 * (10 ** decimals));
-        preIcoStages[1] = Stage(startTime + 1 weeks, startTime + 2 weeks, 10, 1000 * (10 ** decimals));
-        preIcoStages[2] = Stage(startTime + 2 weeks, startTime + 3 weeks, 10, 1000 * (10 ** decimals));
-        preIcoStages[3] = Stage(startTime + 3 weeks, startTime + 4 weeks, 10, 1000 * (10 ** decimals));
+        preIcoStages[0] = Stage(startTime, 1523318400, 44, 1000000 * (10 ** decimals));
+        preIcoStages[1] = Stage(1523318400, 1523923200, 47, 1000000 * (10 ** decimals));
+        preIcoStages[2] = Stage(1523923200, 1524528000, 50, 1000000 * (10 ** decimals));
+        preIcoStages[3] = Stage(1524528000, 1525046400, 52, 1000000 * (10 ** decimals));
         // ICO 4-7
-        icoStages[0] = Stage(startTime + 4 weeks, startTime + 5 weeks, 100000, 3000 * (10 ** decimals));
-        icoStages[1] = Stage(startTime + 5 weeks, startTime + 6 weeks, 1000000, 1000 * (10 ** decimals));
-        icoStages[2] = Stage(startTime + 6 weeks, startTime + 7 weeks, 10000000, 1000 * (10 ** decimals));
-        icoStages[3] = Stage(startTime + 7 weeks, startTime + 8 weeks, 100000000, 1000 * (10 ** decimals));
+        icoStages[0] = Stage(1525132800, 1525651200, 55, 10000000 * (10 ** decimals));
+        icoStages[1] = Stage(1525651200, 1526256000, 60, 20000000 * (10 ** decimals));
+        icoStages[2] = Stage(1526256000, 1526860800, 65, 30000000 * (10 ** decimals));
+        icoStages[3] = Stage(1526860800, 1527379200, 70, 30000000 * (10 ** decimals));
+        preSale();
+    }
+
+    function preSale() internal {
+      /*balances[0x00000] = 100;
+      investors.push(0x0000);*/
     }
 
     function addMembersToWhiteList(address[] members) public onlyKyc_manager {
@@ -143,10 +149,6 @@ contract Crowdsale is SOL{
         }
     }
 
-    function setBountyTokens(uint amount) public onlyBounty_manager {
-        remainedBountyTokens = amount;
-    }
-
     function setPriceEthUSD(uint newPrice) public onlyPrice_updater { // РІ С†РµРЅС‚Р°С…
         priceEthUSD = newPrice;
     }
@@ -154,6 +156,7 @@ contract Crowdsale is SOL{
     function sendBountyTokens(address _to, uint _amount) public onlyBounty_manager {
         require(_amount <= remainedBountyTokens);
         require(isInWhiteList(msg.sender));
+        investors.push(_to);
         balances[_to] = balances[_to].add(_amount);
         remainedBountyTokens = remainedBountyTokens.sub(_amount);
         totalSupply = totalSupply.sub(_amount);
@@ -189,14 +192,14 @@ contract Crowdsale is SOL{
         return this.balance;
     }
 
-    function returnFunds(address investor) public onlyKyc_manager{
+    function returnFunds(address investor) public onlyOwner {
         require(balances[investor] != 0);
         investor.transfer(weiBalances[investor]);
         balances[investor] = 0;
         weiBalances[investor] = 0;
     }
 
-    function returnAllFunds() public onlyKyc_manager {
+    function returnAllFunds() public onlyOwner {
         for (uint i = 0; i < investors.length; i++) {
             returnFunds(investors[i]);
         }
