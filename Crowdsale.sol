@@ -24,6 +24,8 @@ contract Crowdsale is SOL{
     uint public softCap = 100;// general
     bool public outOfTokens = false;
 
+    event IcoIsEnded();
+
     function () public payable{
         require(msg.value > 0);
         require(!outOfTokens);
@@ -34,6 +36,7 @@ contract Crowdsale is SOL{
           burnAllRemainedTokens();
           msg.sender.transfer(msg.value);
           outOfTokens = true;
+          IcoIsEnded();
           return;
         }
 
@@ -77,7 +80,10 @@ contract Crowdsale is SOL{
             if (isICO) weiBalances[msg.sender] = weiBalances[msg.sender].add(remainedTokensWeiPrice);
             updateStages(stages, isICO);
             totalSupply = totalSupply.sub(currentStageRemain);
-            if (isICO) outOfTokens = true;
+            if (isICO) {
+              outOfTokens = true;
+              IcoIsEnded();
+            }
             msg.sender.transfer(msg.value - weiBalances[msg.sender]);
         } else {
             uint debt = paidWei.sub(remainedTokensWeiPrice); // wei
@@ -180,6 +186,8 @@ contract Crowdsale is SOL{
             icoStages[i].remainedTokens = 0;
         }
         remainedBountyTokens = 0;
+        outOfTokens = true;
+        IcoIsEnded();
     }
 
     function sendToFactory() public onlyFactory {
