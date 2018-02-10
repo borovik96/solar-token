@@ -26,7 +26,7 @@ contract Crowdsale is SOL{
 
     event IcoIsEnded();
 
-    function () public payable{
+    function () public payable {
         require(msg.value > 0);
         require(!outOfTokens);
         //require(isInWhiteList(msg.sender));
@@ -47,6 +47,7 @@ contract Crowdsale is SOL{
           isPreICOBurnt = true;
           return;
         }
+        
         bool isICO = now >= icoStages[0].startTime;
         if (!isPreICOBurnt && isICO) burnPreIcoTokens();// BURN preICO tokens;
         updateCurrentStage(isICO);
