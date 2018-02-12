@@ -3,17 +3,31 @@ pragma solidity ^0.4.19;
 import "./SOL.sol";
 
 contract CrowdsaleStage {
-    uint public StartTime;
-    uint public EndTime;
+    using SafeMath for uint256;
+    uint public startTime;
+    uint public endTime;
     uint8 public currentStage;
-    Stage[4] private stages;
-    bool private isEnd;
+    uint8 decimals;
+    Stage[4] internal stages;
+    bool internal isEnd;
     uint8 public constant lastSubStage = 3;
     struct Stage {
         uint startTime;
         uint endTime;
         uint price;
         uint remainedTokens;
+    }
+
+    function getStartTime() public constant returns (uint) {
+        return startTime;
+    }
+
+    function getEndTime() public constant returns (uint) {
+        return endTime;
+    }
+
+    function CrowdsaleStage(uint8 _decimals) public{
+        decimals = _decimals;
     }
 
     function IsEnd() public constant returns (bool) {
@@ -23,26 +37,26 @@ contract CrowdsaleStage {
     //возвращает сколько всего токенов осталось для продажи в рамках данного этапа
     //в Wei или эфире
         // мб сделать через переменную которая инициализируется на уровне конструктора и потом просто вычетается? ну чтоб экономить вычеслительные ресурсы! хотя это костыль
-    function howMuchCanBuy(uint priceEthUSD) public constant returns (uint256 wei) {
-        uint256 wei = 0;
+    function howMuchCanBuy(uint priceEthUSD) public constant returns (uint256 weiAmount) {
+        weiAmount = 0;
         uint256 tokenPrice;
         for (uint8 i = 0; i < stages.length; i++) {
           tokenPrice = calculateTokenPrice(stages[i].price, priceEthUSD);
-          wei = wei.add(stages[i].remainedTokens.mul(tokenPrice));
+          weiAmount = weiAmount.add(stages[i].remainedTokens.mul(tokenPrice));
         }
 
-        return (tokensAmount);
+        return (weiAmount);
     }
 
     // купить токенов. Возвращает кол-во токенов которые продали пользователю
     // если поданная на вход сумма больше суммарной стоимости всех токенов - надо ошибку бросить или че-то такое!
     function buyTokens(uint paidWei, uint priceEthUSD) public returns (uint256 tokensBought) {
-      uint tokensBought = updateBalances(paidWei, 0, priceEthUSD);
+      tokensBought = updateBalances(paidWei, 0, priceEthUSD);
 
       return tokensBought;
     }
 
-    function updateBalances(uint paidWei, uint tokensBought, uint priceEthUSD) returns (uint tokensBought) {
+    function updateBalances(uint paidWei, uint tokensBought, uint priceEthUSD) returns (uint allTokensBought) {
       uint currentPrice = stages[currentStage].price;
       uint tokenWeiPrice = calculateTokenPrice(currentPrice, priceEthUSD);
       uint currentStageRemain = stages[currentStage].remainedTokens;
@@ -105,7 +119,7 @@ contract CrowdsaleStage {
     }
 
     function burnAllRemainedTokens() private returns (uint burntTokens){
-        uint burntTokens = 0;
+        burntTokens = 0;
         for(uint8 i = 0; i < stages.length; i++) {
           burntTokens = burntTokens.add(stages[i].remainedTokens);
           stages[i].remainedTokens = 0;
@@ -178,25 +192,26 @@ contract Crowdsale is SOL{
         require(!outOfTokens);
         //require(isInWhiteList(msg.sender));
 
+        uint paidWei;
+        uint256 tokenBought;
+        if (now >= preIcoStage.getStartTime() && now < preIcoStage.getEndTime()) {
+            require(preIcoStage.howMuchCanBuy(priceEthUSD) > 0);
 
-        if (now >= preIcoStage.startTime && now < preIcoStage.endTime) {
-            require(preIcoStage.howMuchCanBuy() > 0);
-
-            uint paidWei = preIcoStage.howMuchCanBuy() >= msg.value ? msg.value : preIcoStage.howMuchCanBuy();
-            uint256 tokenBought = preIcoStage.buyTokens(paidWei, priceEthUSD);
+            paidWei = preIcoStage.howMuchCanBuy(priceEthUSD) >= msg.value ? msg.value : preIcoStage.howMuchCanBuy(priceEthUSD);
+            tokenBought = preIcoStage.buyTokens(paidWei, priceEthUSD);
 
             balances[msg.sender] = balances[msg.sender].add(tokenBought);
             totalSupply = totalSupply.sub(tokenBought);
 
             if (msg.value > paidWei) msg.sender.transfer(msg.value - paidWei);
-        } else if (now >= icoStage.startTime && now < icoStage.endTime) {
-            if (!preICO.IsEnd()) {
-                preICO.endStage();
+        } else if (now >= icoStage.getStartTime() && now < icoStage.getEndTime()) {
+            if (!preIcoStage.IsEnd()) {
+                preIcoStage.endStage();
             }
-            require(icoStage.howMuchCanBuy() > 0);
+            require(icoStage.howMuchCanBuy(priceEthUSD) > 0);
 
-            uint paidWei = icoStage.howMuchCanBuy() >= msg.value ? msg.value : icoStage.howMuchCanBuy();
-            uint256 tokenBought = icoStage.buyTokens(paidWei, priceEthUSD);
+            paidWei = icoStage.howMuchCanBuy(priceEthUSD) >= msg.value ? msg.value : icoStage.howMuchCanBuy(priceEthUSD);
+            tokenBought = icoStage.buyTokens(paidWei, priceEthUSD);
 
             balances[msg.sender] = balances[msg.sender].add(tokenBought);
             totalSupply = totalSupply.sub(tokenBought);
@@ -205,7 +220,7 @@ contract Crowdsale is SOL{
             weiBalances[msg.sender] = weiBalances[msg.sender].add(paidWei);
 
             if (msg.value > paidWei) msg.sender.transfer(msg.value - paidWei);
-        } else if (now > icoStage.EndTime) {
+        } else if (now > icoStage.getEndTime()) {
             if (!icoStage.IsEnd()) {
                 icoStage.endStage();
                 remainedBountyTokens = 0;
