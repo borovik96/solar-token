@@ -35,9 +35,10 @@ contract CrowdsaleStage {
     }
 
 
-    function howMuchCanBuy(uint priceEthUSD) public constant returns (uint256 weiAmount) {
+    function howMuchCanBuy(uint priceEthUSD) public returns (uint256 weiAmount) {
         weiAmount = 0;
         uint256 tokenPrice;
+        updateCurrentStage();
         for (uint8 i = 0; i < stages.length; i++) {
           tokenPrice = calculateTokenPrice(stages[i].price, priceEthUSD);
           weiAmount = weiAmount.add(stages[i].remainedTokens.mul(tokenPrice).div(10 ** decimals));
@@ -115,9 +116,9 @@ contract CrowdsaleStage {
 }
 
 contract PreICO is CrowdsaleStage {
-  uint private constant stage1end = startTime + 20 seconds;
-  uint private constant stage2end = startTime + 40 seconds;
-  uint private constant stage3end = startTime + 60 seconds;
+  uint private constant stage1end = startTime + 2 seconds;
+  uint private constant stage2end = startTime + 4 seconds;
+  uint private constant stage3end = startTime + 6 seconds;
   uint private constant stage1price = 10;
   uint private constant stage2price = 20;
   uint private constant stage3price = 30;
@@ -126,7 +127,7 @@ contract PreICO is CrowdsaleStage {
   function PreICO() public {
     currentStage = 0;
     startTime = now;
-    endTime = startTime + 80 seconds;
+    endTime = startTime + 180 seconds;
     isEnd = false;
     stages[0] = Stage(startTime, stage1end, stage1price, stageSupply);
     stages[1] = Stage(stage1end, stage2end, stage2price, stageSupply);
