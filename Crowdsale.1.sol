@@ -1,13 +1,13 @@
-pragma solidity ^0.4.19;
+pragma solidity ^0.4.18;
 
 import "./SOL.sol";
 
 contract CrowdsaleStage {
-    using SafeMath for uint256;
+    using SafeMath for uint;
     uint public startTime;
     uint public endTime;
     uint8 public currentStage;
-    uint decimals;
+    uint decimals = 18;
     Stage[4] internal stages;
     bool internal isEnd;
     uint8 public constant lastSubStage = 3;
@@ -26,37 +26,34 @@ contract CrowdsaleStage {
         return endTime;
     }
 
-    function CrowdsaleStage(uint8 _decimals) public{
-        decimals = _decimals;
-    }
+    // function CrowdsaleStage(uint8 _decimals) public{
+    //     decimals = _decimals;
+    // }
 
     function IsEnd() public constant returns (bool) {
         return isEnd;
     }
 
-    //возвращает сколько всего токенов осталось для продажи в рамках данного этапа
-    //в Wei или эфире
-        // мб сделать через переменную которая инициализируется на уровне конструктора и потом просто вычетается? ну чтоб экономить вычеслительные ресурсы! хотя это костыль
+
     function howMuchCanBuy(uint priceEthUSD) public constant returns (uint256 weiAmount) {
         weiAmount = 0;
         uint256 tokenPrice;
         for (uint8 i = 0; i < stages.length; i++) {
           tokenPrice = calculateTokenPrice(stages[i].price, priceEthUSD);
-          weiAmount = weiAmount.add(stages[i].remainedTokens.mul(tokenPrice));
+          weiAmount = weiAmount.add(stages[i].remainedTokens.mul(tokenPrice).div(10 ** decimals));
         }
 
         return (weiAmount);
     }
 
-    // купить токенов. Возвращает кол-во токенов которые продали пользователю
-    // если поданная на вход сумма больше суммарной стоимости всех токенов - надо ошибку бросить или че-то такое!
+
     function buyTokens(uint paidWei, uint priceEthUSD) public returns (uint256 tokensBought) {
       tokensBought = updateBalances(paidWei, 0, priceEthUSD);
 
       return tokensBought;
     }
 
-    function updateBalances(uint paidWei, uint tokensBought, uint priceEthUSD) returns (uint allTokensBought) {
+    function updateBalances(uint paidWei, uint tokensBought, uint priceEthUSD) internal returns (uint allTokensBought) {
       uint currentPrice = stages[currentStage].price;
       uint tokenWeiPrice = calculateTokenPrice(currentPrice, priceEthUSD);
       uint currentStageRemain = stages[currentStage].remainedTokens;
@@ -64,26 +61,14 @@ contract CrowdsaleStage {
       uint remainedTokensWeiPrice = (currentStageRemain.div(10 ** decimals)).mul(tokenWeiPrice);
       amount *= 10 ** decimals;
       if (currentStageRemain >= amount) {
-
-          /*balances[msg.sender] = balances[msg.sender].add(amount);*/
           stages[currentStage].remainedTokens = currentStageRemain.sub(amount);
-          /*if (isICO) weiBalances[msg.sender] = weiBalances[msg.sender].add(paidWei);*/
-          /*totalSupply = totalSupply.sub(amount);*/
           return amount.add(tokensBought);
       } else if (currentStage == lastSubStage) {
-          /*balances[msg.sender] = balances[msg.sender].add(currentStageRemain);*/
           stages[currentStage].remainedTokens = 0;
-          /*if (isICO) weiBalances[msg.sender] = weiBalances[msg.sender].add(remainedTokensWeiPrice);*/
-          /*totalSupply = totalSupply.sub(currentStageRemain);*/
-          /*if (isICO) outOfTokens = true;*/
-          /*msg.sender.transfer(msg.value - weiBalances[msg.sender]);*/
           isEnd = true;
           return currentStageRemain.add(tokensBought);
       } else {
           uint debt = paidWei.sub(remainedTokensWeiPrice); // wei
-          /*balances[msg.sender] = balances[msg.sender].add(currentStageRemain);*/
-          /*if (isICO) weiBalances[msg.sender] = weiBalances[msg.sender].add(remainedTokensWeiPrice);*/
-          /*totalSupply = totalSupply.sub(currentStageRemain);*/
           stages[currentStage].remainedTokens = 0;
           updateCurrentStage();
           return updateBalances(debt, currentStageRemain.add(tokensBought), priceEthUSD);
@@ -130,18 +115,18 @@ contract CrowdsaleStage {
 }
 
 contract PreICO is CrowdsaleStage {
-  uint private constant stage1end = 1523318400;
-  uint private constant stage2end = 1523923200;
-  uint private constant stage3end = 1524528000;
-  uint private constant stage1price = 44;
-  uint private constant stage2price = 47;
-  uint private constant stage3price = 50;
-  uint private constant stage4price = 52;
-  uint private stageSupply = 1000000 * (10 ** decimals);
-  function PreICO() {
+  uint private constant stage1end = startTime + 20 seconds;
+  uint private constant stage2end = startTime + 40 seconds;
+  uint private constant stage3end = startTime + 60 seconds;
+  uint private constant stage1price = 10;
+  uint private constant stage2price = 20;
+  uint private constant stage3price = 30;
+  uint private constant stage4price = 40;
+  uint private stageSupply = 1000 * (10 ** decimals);
+  function PreICO() public {
     currentStage = 0;
-    startTime = 1522713600;
-    endTime = 1525046400;
+    startTime = now;
+    endTime = startTime + 80 seconds;
     isEnd = false;
     stages[0] = Stage(startTime, stage1end, stage1price, stageSupply);
     stages[1] = Stage(stage1end, stage2end, stage2price, stageSupply);
@@ -180,8 +165,8 @@ contract Crowdsale is SOL{
     uint priceEthUSD = 120000;// cent
     uint startTime;
 
-    ICO private icoStage;
-    PreICO private preIcoStage;
+    ICO icoStage;
+    PreICO preIcoStage;
     uint public softCap = 100;// general
     bool public outOfTokens = false;
 
@@ -199,7 +184,6 @@ contract Crowdsale is SOL{
 
             paidWei = preIcoStage.howMuchCanBuy(priceEthUSD) >= msg.value ? msg.value : preIcoStage.howMuchCanBuy(priceEthUSD);
             tokenBought = preIcoStage.buyTokens(paidWei, priceEthUSD);
-
             balances[msg.sender] = balances[msg.sender].add(tokenBought);
             totalSupply = totalSupply.sub(tokenBought);
 
@@ -236,6 +220,8 @@ contract Crowdsale is SOL{
 
     function Crowdsale() public {
         totalSupply = initialSupply;
+        preIcoStage = new PreICO();
+        icoStage = new ICO();
         preSale();
     }
 
