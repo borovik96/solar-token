@@ -7,7 +7,7 @@ contract CrowdsaleStage {
     uint public startTime;
     uint public endTime;
     uint8 public currentStage;
-    uint8 decimals;
+    uint decimals;
     Stage[4] internal stages;
     bool internal isEnd;
     uint8 public constant lastSubStage = 3;
