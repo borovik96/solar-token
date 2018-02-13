@@ -4,6 +4,7 @@ import "./SOL.sol";
 
 contract CrowdsaleStage {
     using SafeMath for uint;
+    //R to private for more security
     uint public startTime;
     uint public endTime;
     uint8 public currentStage;
@@ -18,6 +19,7 @@ contract CrowdsaleStage {
         uint remainedTokens;
     }
 
+    //R all public methods to onlyOwner
     function getStartTime() public constant returns (uint) {
         return startTime;
     }
@@ -65,10 +67,17 @@ contract CrowdsaleStage {
           stages[currentStage].remainedTokens = currentStageRemain.sub(amount);
           return amount.add(tokensBought);
       } else if (currentStage == lastSubStage) {
+          //R я еще не посмотрел что там в точке вызова но чтоб не забыть
+          //R не понятно что будет с деньгами пользователя за которые он не получит токенов
+          //R мне кажется переход в данную ветку ошибочным! соответственно надо кидать исключение или возвращать ошибку - например 0 токенов куплено если сумаа поданная пользователем превышает максимлаьно допустимую
+          //
           stages[currentStage].remainedTokens = 0;
           isEnd = true;
           return currentStageRemain.add(tokensBought);
       } else {
+          //R тут мне кажется ошибка в том что пользователь не получит нисколько токенов по цене текущей стадии
+          //так как данная инфа нигде не сохраняется, а после вызова updateCurrentStage все токены из текущей стадии переедут в следующую
+          //кроме того вычитается цена токенов. мб я не прав но вроде зесь ошибка
           uint debt = paidWei.sub(remainedTokensWeiPrice); // wei
           stages[currentStage].remainedTokens = 0;
           updateCurrentStage();
@@ -79,6 +88,9 @@ contract CrowdsaleStage {
     function updateCurrentStage() internal {
         uint8 i = 0;
 
+        //R теоретически данное условие может стать бесконечным! Например когда у нас now будет за пределами последнего этапа!
+        //R мы вроде не должны такое допускать но проверка тут  будет не лишней 
+        //R или лишней? какое ваше мнение?
         while(!(stages[i].endTime > now && stages[i].startTime <= now)) i++;
 
         currentStage = i;
@@ -99,12 +111,12 @@ contract CrowdsaleStage {
         return (centPrice.mul(10 ** 18)).div(priceEthUSD);
     }
 
-    function endStage() public returns (uint burntTokens){
+    function endStage() public returns (uint burntTokens) {
         isEnd = true;
         return burnAllRemainedTokens();
     }
 
-    function burnAllRemainedTokens() private returns (uint burntTokens){
+    function burnAllRemainedTokens() private returns (uint burntTokens) {
         burntTokens = 0;
         for(uint8 i = 0; i < stages.length; i++) {
           burntTokens = burntTokens.add(stages[i].remainedTokens);
@@ -123,7 +135,11 @@ contract PreICO is CrowdsaleStage {
   uint private constant stage2price = 20;
   uint private constant stage3price = 30;
   uint private constant stage4price = 40;
+  
+  //R why it is not constant??
   uint private stageSupply = 1000 * (10 ** decimals);
+
+  //R мне кажется что всю инициализацию необходимо вынести в одну точку! и параетры стадий передавать в конструкторе!
   function PreICO() public {
     currentStage = 0;
     startTime = now;
@@ -137,6 +153,7 @@ contract PreICO is CrowdsaleStage {
 }
 
 contract ICO is CrowdsaleStage {
+  //R аналогично с предидущем
   uint private constant stage1end = 1525651200;
   uint private constant stage2end = 1526256000;
   uint private constant stage3end = 1526860800;
@@ -157,7 +174,7 @@ contract ICO is CrowdsaleStage {
   }
 }
 
-contract Crowdsale is SOL{
+contract Crowdsale is SOL {
 
     mapping(address => bool) whiteList;
     mapping(address => uint) weiBalances;
@@ -180,19 +197,27 @@ contract Crowdsale is SOL{
 
         uint paidWei;
         uint256 tokenBought;
-        if (now >= preIcoStage.getStartTime() && now < preIcoStage.getEndTime()) {
-            require(preIcoStage.howMuchCanBuy(priceEthUSD) > 0);
 
+        //R можно в начало засунуть !preIcoStage.IsEnd() && - это теоретически ускорит процесс
+        if (now >= preIcoStage.getStartTime() && now < preIcoStage.getEndTime()) {
+            
+            //R вообще здесь можно добавить вместо require if и в случай 0 - завершать этап
+            require(preIcoStage.howMuchCanBuy(priceEthUSD) > 0);
+            
             paidWei = preIcoStage.howMuchCanBuy(priceEthUSD) >= msg.value ? msg.value : preIcoStage.howMuchCanBuy(priceEthUSD);
             tokenBought = preIcoStage.buyTokens(paidWei, priceEthUSD);
             balances[msg.sender] = balances[msg.sender].add(tokenBought);
             totalSupply = totalSupply.sub(tokenBought);
 
             if (msg.value > paidWei) msg.sender.transfer(msg.value - paidWei);
+        
+        //R аналогично !icoStage.IsEnd() &&
         } else if (now >= icoStage.getStartTime() && now < icoStage.getEndTime()) {
             if (!preIcoStage.IsEnd()) {
                 preIcoStage.endStage();
             }
+
+            //R аналогично require заменить на if
             require(icoStage.howMuchCanBuy(priceEthUSD) > 0);
 
             paidWei = icoStage.howMuchCanBuy(priceEthUSD) >= msg.value ? msg.value : icoStage.howMuchCanBuy(priceEthUSD);
@@ -226,6 +251,7 @@ contract Crowdsale is SOL{
         preSale();
     }
 
+    //R всех из preSale надо сразу в whiteList
     function preSale() internal {
       /*balances[0x00000] = 100;
       investors.push(0x0000);*/
@@ -261,6 +287,8 @@ contract Crowdsale is SOL{
         return false;
     }
 
+    //R я мб пропустил но как будут выводиться средства с preICO для которого нет softCAP
+    //R в рамках ICO деньги должны выводиться только по оконанию ICO
     function sendToFactory() public onlyFactory {
       uint usdCollected = this.balance.mul(priceEthUSD.div(100));
       if (usdCollected < softCap) revert();
