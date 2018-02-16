@@ -19,4 +19,8 @@ contract Access is Ownable{
         require(msg.sender == kyc_manager);
         _;
     }
+    modifier onlyFactory() {
+        require(msg.sender == factory);
+        _;
+    }
 }
