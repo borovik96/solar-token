@@ -4,10 +4,11 @@ import "./SOL.sol";
 
 contract CrowdsaleStage {
     using SafeMath for uint;
-    uint public startTime;
-    uint public endTime;
-    uint8 public currentStage;
-    uint decimals = 18;
+    //R to private for more security FIXED
+    uint internal startTime;
+    uint internal endTime;
+    uint8 internal currentStage;
+    uint decimals;
     Stage[4] internal stages;
     bool internal isEnd;
     uint8 public constant lastSubStage = 3;
@@ -18,11 +19,12 @@ contract CrowdsaleStage {
         uint remainedTokens;
     }
 
-    function getStartTime() public constant returns (uint) {
+    //R all public methods to onlyOwner
+    function getStartTime() public constant onlyOwner returns (uint) {
         return startTime;
     }
 
-    function getEndTime() public constant returns (uint) {
+    function getEndTime() public constant onlyOwner returns (uint) {
         return endTime;
     }
 
@@ -30,12 +32,12 @@ contract CrowdsaleStage {
     //     decimals = _decimals;
     // }
 
-    function IsEnd() public constant returns (bool) {
+    function IsEnd() public constant onlyOwner returns (bool) {
         return isEnd;
     }
 
 
-    function howMuchCanBuy(uint priceEthUSD) public returns (uint256 weiAmount) {
+    function howMuchCanBuy(uint priceEthUSD) public onlyOwner returns (uint256 weiAmount) {
         weiAmount = 0;
         uint256 tokenPrice;
         updateCurrentStage();
@@ -48,7 +50,7 @@ contract CrowdsaleStage {
     }
 
 
-    function buyTokens(uint paidWei, uint priceEthUSD) public returns (uint256 tokensBought) {
+    function buyTokens(uint paidWei, uint priceEthUSD) public onlyOwner returns (uint256 tokensBought) {
       tokensBought = updateBalances(paidWei, 0, priceEthUSD);
 
       return tokensBought;
@@ -65,10 +67,22 @@ contract CrowdsaleStage {
           stages[currentStage].remainedTokens = currentStageRemain.sub(amount);
           return amount.add(tokensBought);
       } else if (currentStage == lastSubStage) {
+          //R я еще не посмотрел что там в точке вызова но чтоб не забыть
+          //R не понятно что будет с деньгами пользователя за которые он не получит токенов
+          //R мне кажется переход в данную ветку ошибочным! соответственно надо кидать исключение или возвращать ошибку - например 0 токенов куплено если сумаа поданная пользователем превышает максимлаьно допустимую
+          //
+          // Всё верно, можем объяснить
+          //
           stages[currentStage].remainedTokens = 0;
           isEnd = true;
           return currentStageRemain.add(tokensBought);
       } else {
+          //R тут мне кажется ошибка в том что пользователь не получит нисколько токенов по цене текущей стадии
+          //так как данная инфа нигде не сохраняется, а после вызова updateCurrentStage все токены из текущей стадии переедут в следующую
+          //кроме того вычитается цена токенов. мб я не прав но вроде зесь ошибка
+          //
+          // Всё верно, можем объяснить
+          //
           uint debt = paidWei.sub(remainedTokensWeiPrice); // wei
           stages[currentStage].remainedTokens = 0;
           updateCurrentStage();
@@ -79,6 +93,12 @@ contract CrowdsaleStage {
     function updateCurrentStage() internal {
         uint8 i = 0;
 
+        //R теоретически данное условие может стать бесконечным! Например когда у нас now будет за пределами последнего этапа!
+        //R мы вроде не должны такое допускать но проверка тут  будет не лишней
+        //R или лишней? какое ваше мнение?
+        //
+        // Если now большое, то не попадём сюда, думаю лишнее будет, если мыз наем что этого не произойдёт
+        //
         while(!(stages[i].endTime > now && stages[i].startTime <= now)) i++;
 
         currentStage = i;
@@ -99,12 +119,12 @@ contract CrowdsaleStage {
         return (centPrice.mul(10 ** 18)).div(priceEthUSD);
     }
 
-    function endStage() public returns (uint burntTokens){
+    function endStage() public returns (uint burntTokens) {
         isEnd = true;
         return burnAllRemainedTokens();
     }
 
-    function burnAllRemainedTokens() private returns (uint burntTokens){
+    function burnAllRemainedTokens() private returns (uint burntTokens) {
         burntTokens = 0;
         for(uint8 i = 0; i < stages.length; i++) {
           burntTokens = burntTokens.add(stages[i].remainedTokens);
@@ -123,7 +143,15 @@ contract PreICO is CrowdsaleStage {
   uint private constant stage2price = 20;
   uint private constant stage3price = 30;
   uint private constant stage4price = 40;
-  uint private stageSupply = 1000 * (10 ** decimals);
+
+  //R why it is not constant??
+  // FIXED
+  uint private constant stageSupply = 1000 * (10 ** decimals);
+
+  //R мне кажется что всю инициализацию необходимо вынести в одну точку! и параетры стадий передавать в конструкторе!
+  //
+  // Обсудили, не будем менять
+  //
   function PreICO() public {
     currentStage = 0;
     startTime = now;
@@ -137,6 +165,10 @@ contract PreICO is CrowdsaleStage {
 }
 
 contract ICO is CrowdsaleStage {
+  //R аналогично с предидущем
+  //
+  // Обсудили, не будем менять
+  //
   uint private constant stage1end = 1525651200;
   uint private constant stage2end = 1526256000;
   uint private constant stage3end = 1526860800;
@@ -157,7 +189,7 @@ contract ICO is CrowdsaleStage {
   }
 }
 
-contract Crowdsale is SOL{
+contract Crowdsale is SOL {
 
     mapping(address => bool) whiteList;
     mapping(address => uint) weiBalances;
@@ -165,7 +197,7 @@ contract Crowdsale is SOL{
     uint public remainedBountyTokens = 1893000;
     uint priceEthUSD = 120000;// cent
     uint startTime;
-
+    uint icoTokensSold;
     ICO icoStage;
     PreICO preIcoStage;
     uint public softCap = 100;// general
@@ -180,7 +212,16 @@ contract Crowdsale is SOL{
 
         uint paidWei;
         uint256 tokenBought;
-        if (now >= preIcoStage.getStartTime() && now < preIcoStage.getEndTime()) {
+
+        //R можно в начало засунуть !preIcoStage.IsEnd() && - это теоретически ускорит процесс
+        //
+        // FIXED
+        if (!preIcoStage.IsEnd() && now >= preIcoStage.getStartTime() && now < preIcoStage.getEndTime()) {
+
+            //R вообще здесь можно добавить вместо require if и в случай 0 - завершать этап
+            //
+            // Этапы завершаются автоматически в одном месте (updateBalances) если у нас 0, то этап уже завершён
+            //
             require(preIcoStage.howMuchCanBuy(priceEthUSD) > 0);
 
             paidWei = preIcoStage.howMuchCanBuy(priceEthUSD) >= msg.value ? msg.value : preIcoStage.howMuchCanBuy(priceEthUSD);
@@ -189,15 +230,24 @@ contract Crowdsale is SOL{
             totalSupply = totalSupply.sub(tokenBought);
 
             if (msg.value > paidWei) msg.sender.transfer(msg.value - paidWei);
-        } else if (now >= icoStage.getStartTime() && now < icoStage.getEndTime()) {
+
+        //R аналогично !icoStage.IsEnd() &&
+        //
+        // FIXED
+        } else if (!icoStage.IsEnd() && now >= icoStage.getStartTime() && now < icoStage.getEndTime()) {
             if (!preIcoStage.IsEnd()) {
                 preIcoStage.endStage();
+                factory.transfer(this.balance);
             }
+
+            //R аналогично require заменить на if
+            //
+            // Ответ выше (223 строка)
             require(icoStage.howMuchCanBuy(priceEthUSD) > 0);
 
             paidWei = icoStage.howMuchCanBuy(priceEthUSD) >= msg.value ? msg.value : icoStage.howMuchCanBuy(priceEthUSD);
             tokenBought = icoStage.buyTokens(paidWei, priceEthUSD);
-
+            icoTokensSold = icoTokensSold.add(tokenBought);
             balances[msg.sender] = balances[msg.sender].add(tokenBought);
             totalSupply = totalSupply.sub(tokenBought);
 
@@ -208,6 +258,8 @@ contract Crowdsale is SOL{
         } else if (now > icoStage.getEndTime()) {
             if (!icoStage.IsEnd()) {
                 icoStage.endStage();
+                uint usdCollected = this.balance.mul(priceEthUSD.div(100));
+                if (udsCollected >= softCap) balances[factory] = icoTokensSold.sub(totalSupply).div(10); // 10 percent of all tokens
                 remainedBountyTokens = 0;
                 outOfTokens = true;
                 IcoIsEnded();
@@ -226,9 +278,15 @@ contract Crowdsale is SOL{
         preSale();
     }
 
+    //R всех из preSale надо сразу в whiteList
+    //
+    // Fixed
     function preSale() internal {
-      /*balances[0x00000] = 100;
-      investors.push(0x0000);*/
+      /*
+      balances[0x00000] = 100;
+      investors.push(0x0000);
+      whiteList[0x0000] = true;
+      */
     }
 
     function addMembersToWhiteList(address[] members) public onlyKyc_manager {
@@ -243,7 +301,7 @@ contract Crowdsale is SOL{
         }
     }
 
-    function setPriceEthUSD(uint newPrice) public onlyPrice_updater { // РІ С†РµРЅС‚Р°С…
+    function setPriceEthUSD(uint newPrice) public onlyPrice_updater { // cent
         priceEthUSD = newPrice;
     }
 
@@ -261,7 +319,13 @@ contract Crowdsale is SOL{
         return false;
     }
 
+    //R я мб пропустил но как будут выводиться средства с preICO для которого нет softCAP
+    //R в рамках ICO деньги должны выводиться только по оконанию ICO
     function sendToFactory() public onlyFactory {
+      if (!preICO.isEnd()) {
+        factory.transfer(this.balance);
+        return;
+      }
       uint usdCollected = this.balance.mul(priceEthUSD.div(100));
       if (usdCollected < softCap) revert();
       factory.transfer(this.balance);
