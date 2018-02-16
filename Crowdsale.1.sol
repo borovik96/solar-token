@@ -135,57 +135,112 @@ contract CrowdsaleStage {
 
 }
 
+contract PreICOParams {
+  uint public constant stage1end = 1523318400;
+  uint public constant stage2end = 1523923200;
+  uint public constant stage3end = 1524528000;
+  uint public constant stage1price = 44;
+  uint public constant stage2price = 47;
+  uint public constant stage3price = 50;
+  uint public constant stage4price = 52;
+  uint public stage1Supply = 10000000;
+  uint public stage2Supply = 10000000;
+  uint public stage3Supply = 10000000;
+  uint public stage4Supply = 10000000;
+  uint public startTime = 1522713600;
+  uint public endTime = 1525046400;
+
+}
+
 contract PreICO is CrowdsaleStage {
-  uint private constant stage1end = startTime + 2 seconds;
-  uint private constant stage2end = startTime + 4 seconds;
-  uint private constant stage3end = startTime + 6 seconds;
-  uint private constant stage1price = 10;
-  uint private constant stage2price = 20;
-  uint private constant stage3price = 30;
-  uint private constant stage4price = 40;
-
-  //R why it is not constant??
-  // FIXED
-  uint private constant stageSupply = 1000 * (10 ** decimals);
-
-  //R мне кажется что всю инициализацию необходимо вынести в одну точку! и параетры стадий передавать в конструкторе!
+  //R аналогично с предидущем
   //
-  // Обсудили, не будем менять
-  //
-  function PreICO() public {
+
+  PreICOParams preIcoParams = new PreICOParams();
+  function PreICO() {
     currentStage = 0;
-    startTime = now;
-    endTime = startTime + 180 seconds;
+    startTime = preIcoParams.startTime();
+    endTime = preIcoParams.endTime();
     isEnd = false;
-    stages[0] = Stage(startTime, stage1end, stage1price, stageSupply);
-    stages[1] = Stage(stage1end, stage2end, stage2price, stageSupply);
-    stages[2] = Stage(stage2end, stage3end, stage3price, stageSupply);
-    stages[3] = Stage(stage3end, endTime, stage4price, stageSupply);
+    stages[0] = Stage(
+      preIcoParams.startTime(),
+      preIcoParams.stage1end(),
+      preIcoParams.stage1price(),
+      preIcoParams.stageSupply().mul(10 ** decimals)
+    );
+    stages[1] = Stage(
+      preIcoParams.stage1end(),
+      preIcoParams.stage2end(),
+      preIcoParams.stage2price(),
+      preIcoParams.stageSupply().mul(10 ** decimals)
+    );
+    stages[2] = Stage(
+      preIcoParams.stage2end(),
+      preIcoParams.stage3end(),
+      preIcoParams.stage3price(),
+      preIcoParams.stageSupply().mul(10 ** decimals)
+    );
+    stages[3] = Stage(
+      preIcoParams.stage3end(),
+      preIcoParams.endTime(),
+      preIcoParams.stage4price(),
+      preIcoParams.stageSupply().mul(10 ** decimals)
+    );
   }
+}
+
+
+contract ICOParams {
+  uint public constant stage1end = 1525651200;
+  uint public constant stage2end = 1526256000;
+  uint public constant stage3end = 1526860800;
+  uint public constant stage1price = 55;
+  uint public constant stage2price = 60;
+  uint public constant stage3price = 65;
+  uint public constant stage4price = 70;
+  uint public stage1Supply = 10000000;
+  uint public stage2Supply = 20000000;
+  uint public stage3Supply = 30000000;
+  uint public stage4Supply = 30000000;
+  uint public startTime = 1525132800;
+  uint public endTime = 1527379200;
+
 }
 
 contract ICO is CrowdsaleStage {
   //R аналогично с предидущем
   //
-  // Обсудили, не будем менять
-  //
-  uint private constant stage1end = 1525651200;
-  uint private constant stage2end = 1526256000;
-  uint private constant stage3end = 1526860800;
-  uint private constant stage1price = 55;
-  uint private constant stage2price = 60;
-  uint private constant stage3price = 65;
-  uint private constant stage4price = 70;
-  uint private stageSupply = 10000000 * (10 ** decimals);
+
+  ICOParams icoParams = new ICOParams();
   function ICO() {
     currentStage = 0;
-    startTime = 1525132800;
-    endTime = 1527379200;
+    startTime = icoParams.startTime();
+    endTime = icoParams.endTime();
     isEnd = false;
-    stages[0] = Stage(startTime, stage1end, stage1price, stageSupply);
-    stages[1] = Stage(stage1end, stage2end, stage2price, stageSupply.mul(2));
-    stages[2] = Stage(stage2end, stage3end, stage3price, stageSupply.mul(3));
-    stages[3] = Stage(stage3end, endTime, stage4price, stageSupply.mul(3));
+    stages[0] = Stage(
+      icoParams.startTime(),
+      icoParams.stage1end(),
+      icoParams.stage1price(),
+      icoParams.stageSupply().mul(10 ** decimals)
+    );
+    stages[1] = Stage(
+      icoParams.stage1end(),
+      icoParams.stage2end(),
+      icoParams.stage2price(),
+      icoParams.stageSupply().mul(10 ** decimals)
+    );
+    stages[2] = Stage(
+      icoParams.stage2end(),
+      icoParams.stage3end(),
+      icoParams.stage3price(),
+      icoParams.stageSupply().mul(10 ** decimals)
+    );
+    stages[3] = Stage(
+      icoParams.stage3end(),
+      icoParams.endTime(),
+      icoParams.stage4price(),
+      icoParams.stageSupply().mul(10 ** decimals)
+    );
   }
 }
 
