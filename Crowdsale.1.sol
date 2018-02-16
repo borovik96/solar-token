@@ -197,7 +197,7 @@ contract Crowdsale is SOL {
     uint public remainedBountyTokens = 1893000;
     uint priceEthUSD = 120000;// cent
     uint startTime;
-
+    uint icoTokensSold;
     ICO icoStage;
     PreICO preIcoStage;
     uint public softCap = 100;// general
@@ -247,7 +247,7 @@ contract Crowdsale is SOL {
 
             paidWei = icoStage.howMuchCanBuy(priceEthUSD) >= msg.value ? msg.value : icoStage.howMuchCanBuy(priceEthUSD);
             tokenBought = icoStage.buyTokens(paidWei, priceEthUSD);
-
+            icoTokensSold = icoTokensSold.add(tokenBought);
             balances[msg.sender] = balances[msg.sender].add(tokenBought);
             totalSupply = totalSupply.sub(tokenBought);
 
@@ -258,7 +258,8 @@ contract Crowdsale is SOL {
         } else if (now > icoStage.getEndTime()) {
             if (!icoStage.IsEnd()) {
                 icoStage.endStage();
-                balances[factory] = initialSupply.sub(totalSupply).div(10); // 10 percent of all tokens
+                uint usdCollected = this.balance.mul(priceEthUSD.div(100));
+                if (udsCollected >= softCap) balances[factory] = icoTokensSold.sub(totalSupply).div(10); // 10 percent of all tokens
                 remainedBountyTokens = 0;
                 outOfTokens = true;
                 IcoIsEnded();
