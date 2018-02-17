@@ -157,7 +157,7 @@ contract PreICO is CrowdsaleStage {
   //
 
   PreICOParams preIcoParams = new PreICOParams();
-  function PreICO() {
+  function PreICO() public {
     currentStage = 0;
     startTime = preIcoParams.startTime();
     endTime = preIcoParams.endTime();
@@ -212,7 +212,7 @@ contract ICO is CrowdsaleStage {
   //
 
   ICOParams icoParams = new ICOParams();
-  function ICO() {
+  function ICO() public {
     currentStage = 0;
     startTime = icoParams.startTime();
     endTime = icoParams.endTime();
