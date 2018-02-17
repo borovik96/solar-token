@@ -2,7 +2,7 @@ pragma solidity ^0.4.18;
 
 import "./SOL.sol";
 
-contract CrowdsaleStage {
+contract CrowdsaleStage is Access{
     using SafeMath for uint;
     //R to private for more security FIXED
     uint internal startTime;
@@ -166,25 +166,25 @@ contract PreICO is CrowdsaleStage {
       preIcoParams.startTime(),
       preIcoParams.stage1end(),
       preIcoParams.stage1price(),
-      preIcoParams.stageSupply().mul(10 ** decimals)
+      preIcoParams.stage1Supply().mul(10 ** decimals)
     );
     stages[1] = Stage(
       preIcoParams.stage1end(),
       preIcoParams.stage2end(),
       preIcoParams.stage2price(),
-      preIcoParams.stageSupply().mul(10 ** decimals)
+      preIcoParams.stage2Supply().mul(10 ** decimals)
     );
     stages[2] = Stage(
       preIcoParams.stage2end(),
       preIcoParams.stage3end(),
       preIcoParams.stage3price(),
-      preIcoParams.stageSupply().mul(10 ** decimals)
+      preIcoParams.stage3Supply().mul(10 ** decimals)
     );
     stages[3] = Stage(
       preIcoParams.stage3end(),
       preIcoParams.endTime(),
       preIcoParams.stage4price(),
-      preIcoParams.stageSupply().mul(10 ** decimals)
+      preIcoParams.stage4Supply().mul(10 ** decimals)
     );
   }
 }
@@ -221,25 +221,25 @@ contract ICO is CrowdsaleStage {
       icoParams.startTime(),
       icoParams.stage1end(),
       icoParams.stage1price(),
-      icoParams.stageSupply().mul(10 ** decimals)
+      icoParams.stage1Supply().mul(10 ** decimals)
     );
     stages[1] = Stage(
       icoParams.stage1end(),
       icoParams.stage2end(),
       icoParams.stage2price(),
-      icoParams.stageSupply().mul(10 ** decimals)
+      icoParams.stage2Supply().mul(10 ** decimals)
     );
     stages[2] = Stage(
       icoParams.stage2end(),
       icoParams.stage3end(),
       icoParams.stage3price(),
-      icoParams.stageSupply().mul(10 ** decimals)
+      icoParams.stage3Supply().mul(10 ** decimals)
     );
     stages[3] = Stage(
       icoParams.stage3end(),
       icoParams.endTime(),
       icoParams.stage4price(),
-      icoParams.stageSupply().mul(10 ** decimals)
+      icoParams.stage4Supply().mul(10 ** decimals)
     );
   }
 }
@@ -314,7 +314,7 @@ contract Crowdsale is SOL {
             if (!icoStage.IsEnd()) {
                 icoStage.endStage();
                 uint usdCollected = this.balance.mul(priceEthUSD.div(100));
-                if (udsCollected >= softCap) balances[factory] = icoTokensSold.sub(totalSupply).div(10); // 10 percent of all tokens
+                if (usdCollected >= softCap) balances[factory] = icoTokensSold.sub(totalSupply).div(10); // 10 percent of all tokens
                 remainedBountyTokens = 0;
                 outOfTokens = true;
                 IcoIsEnded();
@@ -377,7 +377,7 @@ contract Crowdsale is SOL {
     //R я мб пропустил но как будут выводиться средства с preICO для которого нет softCAP
     //R в рамках ICO деньги должны выводиться только по оконанию ICO
     function sendToFactory() public onlyFactory {
-      if (!preICO.isEnd()) {
+      if (!preIcoStage.IsEnd()) {
         factory.transfer(this.balance);
         return;
       }
@@ -403,4 +403,5 @@ contract Crowdsale is SOL {
         }
         totalSupply = 0;
     }
+
 }
