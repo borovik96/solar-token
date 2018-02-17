@@ -1,6 +1,8 @@
-pragma solidity ^0.4.18;
+pragma solidity ^0.4.19;
 
 import "./SOL.sol";
+import "./PreICOParams.sol";
+import "./ICOParams.sol";
 
 contract CrowdsaleStage is Access{
     using SafeMath for uint;
@@ -135,22 +137,7 @@ contract CrowdsaleStage is Access{
 
 }
 
-contract PreICOParams {
-  uint public constant stage1end = 1523318400;
-  uint public constant stage2end = 1523923200;
-  uint public constant stage3end = 1524528000;
-  uint public constant stage1price = 44;
-  uint public constant stage2price = 47;
-  uint public constant stage3price = 50;
-  uint public constant stage4price = 52;
-  uint public stage1Supply = 10000000;
-  uint public stage2Supply = 10000000;
-  uint public stage3Supply = 10000000;
-  uint public stage4Supply = 10000000;
-  uint public startTime = 1522713600;
-  uint public endTime = 1525046400;
 
-}
 
 contract PreICO is CrowdsaleStage {
   //R аналогично с предидущем
@@ -190,22 +177,7 @@ contract PreICO is CrowdsaleStage {
 }
 
 
-contract ICOParams {
-  uint public constant stage1end = 1525651200;
-  uint public constant stage2end = 1526256000;
-  uint public constant stage3end = 1526860800;
-  uint public constant stage1price = 55;
-  uint public constant stage2price = 60;
-  uint public constant stage3price = 65;
-  uint public constant stage4price = 70;
-  uint public stage1Supply = 10000000;
-  uint public stage2Supply = 20000000;
-  uint public stage3Supply = 30000000;
-  uint public stage4Supply = 30000000;
-  uint public startTime = 1525132800;
-  uint public endTime = 1527379200;
 
-}
 
 contract ICO is CrowdsaleStage {
   //R аналогично с предидущем
@@ -264,6 +236,7 @@ contract Crowdsale is SOL {
         require(msg.value > 0);
         require(!outOfTokens);
         //require(isInWhiteList(msg.sender));
+        if (msg.sender == factory) return;
 
         uint paidWei;
         uint256 tokenBought;
