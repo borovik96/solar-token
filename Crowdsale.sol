@@ -1,147 +1,285 @@
 pragma solidity ^0.4.19;
 
 import "./SOL.sol";
+import "./PreICOParams.sol";
+import "./ICOParams.sol";
 
-//R delete this file
-contract Crowdsale is SOL{
-    mapping(address => bool) whiteList;
-    mapping(address => uint) weiBalances;
-    address[] investors;
-    uint public remainedBountyTokens = 1893000;
-    uint priceEthUSD = 120000;// cent
-    uint startTime;
-    uint public currentStage = 0;
-    uint8 lastSubStage = 3;
-    bool isPreICOBurnt = false;
+contract CrowdsaleStage is Access{
+    using SafeMath for uint;
+    uint internal startTime;
+    uint internal endTime;
+    uint8 internal currentStage;
+    uint public decimals;
+    Stage[4] internal stages;
+    bool internal isEnd;
+
+    //R all constan to uperrcase http://solidity.readthedocs.io/en/develop/style-guide.html
+    uint8 public constant LAST_SUB_STAGE = 3;
+
     struct Stage {
         uint startTime;
         uint endTime;
         uint price;
         uint remainedTokens;
     }
-    Stage[4] private icoStages;
-    Stage[4] private preIcoStages;
+
+    function getStartTime() public constant onlyOwner returns (uint) {
+        return startTime;
+    }
+
+    function getEndTime() public constant onlyOwner returns (uint) {
+        return endTime;
+    }
+    function getIsEnd() public constant onlyOwner returns (bool) {
+        return isEnd;
+    }
+
+    function isActive() public constant onlyOwner returns (bool) {
+      return (!isEnd && now >= startTime && now < endTime)
+    }
+
+    function howMuchCanBuy(uint priceEthUSD) public onlyOwner returns (uint256 weiAmount) {
+        weiAmount = 0;
+        uint256 tokenPrice;
+        updateCurrentStage();
+        for (uint8 i = 0; i < stages.length; i++) {
+          tokenPrice = calculateTokenPrice(stages[i].price, priceEthUSD);
+          weiAmount = weiAmount.add(stages[i].remainedTokens.mul(tokenPrice).div(10 ** decimals));
+        }
+
+        return (weiAmount);
+    }
+
+
+    function buyTokens(uint paidWei, uint priceEthUSD) public onlyOwner returns (uint256 tokensBought) {
+      require(howMuchCanBuy(priceEthUSD) >= paidWei);
+      tokensBought = updateBalances(paidWei, 0, priceEthUSD);
+
+      return tokensBought;
+    }
+
+    function updateBalances(uint paidWei, uint tokensBought, uint priceEthUSD) internal returns (uint allTokensBought) {
+      uint currentPrice = stages[currentStage].price;
+      uint tokenWeiPrice = calculateTokenPrice(currentPrice, priceEthUSD);
+      uint currentStageRemain = stages[currentStage].remainedTokens;
+      uint amount = paidWei.div(tokenWeiPrice);
+      uint remainedTokensWeiPrice = (currentStageRemain.div(10 ** decimals)).mul(tokenWeiPrice);
+      amount *= 10 ** decimals;
+      if (currentStageRemain >= amount) {
+          stages[currentStage].remainedTokens = currentStageRemain.sub(amount);
+          if (currentStage == LAST_SUB_STAGE && currentStageRemain == amount) {
+            isEnd = true;
+          }
+          return amount.add(tokensBought);
+      } else {
+          uint debt = paidWei.sub(remainedTokensWeiPrice); // wei
+          stages[currentStage].remainedTokens = 0;
+          updateCurrentStage();
+          return updateBalances(debt, currentStageRemain.add(tokensBought), priceEthUSD);
+      }
+    }
+
+    function updateCurrentStage() internal {
+        uint8 i = 0;
+        while(!(stages[i].endTime > now && stages[i].startTime <= now)) i++;
+
+        currentStage = i;
+
+        for (uint8 k = 0; k < i; k++) { // collect all tokens to currentStage
+          stages[currentStage].remainedTokens = stages[currentStage].remainedTokens.add(stages[k].remainedTokens);
+          stages[k].remainedTokens = 0;
+        }
+
+        if (stages[currentStage].remainedTokens <= 0) {
+          stages[currentStage].endTime = now;
+          currentStage += 1;
+          stages[currentStage].startTime = now;
+        }
+    }
+
+    function calculateTokenPrice(uint centPrice, uint priceEthUSD) internal constant returns (uint weiPrice) {
+        return (centPrice.mul(10 ** 18)).div(priceEthUSD);
+    }
+
+    function endStage() public returns (uint burntTokens) {
+        isEnd = true;
+        return burnAllRemainedTokens();
+    }
+
+    function burnAllRemainedTokens() private returns (uint burntTokens) {
+        burntTokens = 0;
+        for(uint8 i = 0; i < stages.length; i++) {
+          burntTokens = burntTokens.add(stages[i].remainedTokens);
+          stages[i].remainedTokens = 0;
+        }
+        return burntTokens;
+    }
+
+}
+
+
+
+contract PreICO is CrowdsaleStage {
+  PreICOParams preIcoParams = new PreICOParams();
+  function PreICO() public {
+    currentStage = 0;
+    startTime = preIcoParams.START_TIME();
+    endTime = preIcoParams.endTime();
+    isEnd = false;
+    stages[0] = Stage(
+      preIcoParams.START_TIME(),
+      preIcoParams.STAGE_1_END(),
+      preIcoParams.STAGE_1_PRICE(),
+      preIcoParams.STAGE_1_SUPPLY().mul(10 ** decimals)
+    );
+    stages[1] = Stage(
+      preIcoParams.STAGE_1_END(),
+      preIcoParams.STAGE_2_END(),
+      preIcoParams.STAGE_2_PRICE(),
+      preIcoParams.STAGE_2_SUPPLY().mul(10 ** decimals)
+    );
+    stages[2] = Stage(
+      preIcoParams.STAGE_2_END(),
+      preIcoParams.STAGE_3_END(),
+      preIcoParams.STAGE_3_PRICE(),
+      preIcoParams.STAGE_3_SUPPLY().mul(10 ** decimals)
+    );
+    stages[3] = Stage(
+      preIcoParams.STAGE_3_END(),
+      preIcoParams.END_TIME(),
+      preIcoParams.STAGE_4_PRICE(),
+      preIcoParams.STAGE_4_SUPPLY().mul(10 ** decimals)
+    );
+  }
+}
+
+
+
+
+contract ICO is CrowdsaleStage {
+  ICOParams icoParams = new ICOParams();
+  function ICO() public {
+    currentStage = 0;
+    startTime = icoParams.START_TIME();
+    endTime = icoParams.END_TIME();
+    isEnd = false;
+    stages[0] = Stage(
+      icoParams.START_TIME(),
+      icoParams.STAGE_1_END(),
+      icoParams.STAGE_1_PRICE(),
+      icoParams.STAGE_1_SUPPLY().mul(10 ** decimals)
+    );
+    stages[1] = Stage(
+      icoParams.STAGE_1_END(),
+      icoParams.STAGE_2_END(),
+      icoParams.STAGE_2_PRICE(),
+      icoParams.STAGE_2_SUPPLY().mul(10 ** decimals)
+    );
+    stages[2] = Stage(
+      icoParams.STAGE_2_END(),
+      icoParams.STAGE_3_END(),
+      icoParams.STAGE_3_PRICE(),
+      icoParams.STAGE_3_SUPPLY().mul(10 ** decimals)
+    );
+    stages[3] = Stage(
+      icoParams.STAGE_3_END(),
+      icoParams.END_TIME(),
+      icoParams.STAGE_4_PRICE(),
+      icoParams.STAGE_4_SUPPLY().mul(10 ** decimals)
+    );
+  }
+}
+
+contract Crowdsale is SOL {
+
+    mapping(address => bool) whiteList;
+    mapping(address => uint) weiBalances;
+    address[] investors;
+    uint public remainedBountyTokens = 1893000;
+    uint priceEthUSD = 120000;// cent
+    uint startTime;
+    uint icoTokensSold;
+    ICO icoStage;
+    PreICO preIcoStage;
     uint public softCap = 100;// general
     bool public outOfTokens = false;
-
-    event IcoIsEnded();
+    uint constant PANEL_PRICE = 600; // in tokens
+    uint constant TOKEN_BUYOUT_PRICE = 110; // in cent
+    event IcoEnded();
 
     function () public payable {
         require(msg.value > 0);
+
+        if (icoStage.getIsEnd()) return; // just save money on wallet for payout
+
         require(!outOfTokens);
         //require(isInWhiteList(msg.sender));
-        require(icoStages[lastSubStage].endTime > now);
-        if (now > icoStages[lastSubStage].endTime) {
-          //BURN ALL remains tokens and return money
-          burnAllRemainedTokens();
-          msg.sender.transfer(msg.value);
-          outOfTokens = true;
-          IcoIsEnded();
-          return;
-        }
 
-        if (now > preIcoStages[lastSubStage].endTime && now < icoStages[0].startTime) { // time between PreICO and ICO
-          // BURN preICO remains tokens and return money
-          burnPreIcoTokens();
-          msg.sender.transfer(msg.value);
-          isPreICOBurnt = true;
-          return;
-        }
-        
-        bool isICO = now >= icoStages[0].startTime;
-        if (!isPreICOBurnt && isICO) burnPreIcoTokens();// BURN preICO tokens;
-        updateCurrentStage(isICO);
-        if (isICO) updateBalances(icoStages, msg.value, true); // ICO go
-        else updateBalances(preIcoStages, msg.value, false); // preICO is going on
+        uint paidWei;
+        uint256 tokenBought;
 
+        if (preIcoStage.isActive()) {
+            require(preIcoStage.howMuchCanBuy(priceEthUSD) > 0);
+
+            paidWei = preIcoStage.howMuchCanBuy(priceEthUSD) >= msg.value ? msg.value : preIcoStage.howMuchCanBuy(priceEthUSD);
+            tokenBought = preIcoStage.buyTokens(paidWei, priceEthUSD);
+            balances[msg.sender] = balances[msg.sender].add(tokenBought);
+            totalSupply = totalSupply.add(tokenBought);
+
+            if (msg.value > paidWei) msg.sender.transfer(msg.value - paidWei);
+
+        } else if (icoStage.isActive()) {
+            if (!preIcoStage.getIsEnd()) {
+                preIcoStage.endStage();
+                factory.transfer(this.balance);
+            }
+
+            if (icoStage.howMuchCanBuy(priceEthUSD) <= 0) {
+              isoStage.endStage();
+              msg.sender.transfer(msg.value);
+              return;
+            }
+
+            paidWei = icoStage.howMuchCanBuy(priceEthUSD) >= msg.value ? msg.value : icoStage.howMuchCanBuy(priceEthUSD);
+            tokenBought = icoStage.buyTokens(paidWei, priceEthUSD);
+            icoTokensSold = icoTokensSold.add(tokenBought);
+            balances[msg.sender] = balances[msg.sender].add(tokenBought);
+            totalSupply = totalSupply.add(tokenBought);
+
+            if (weiBalances[msg.sender] == 0) investors.push(msg.sender);
+            weiBalances[msg.sender] = weiBalances[msg.sender].add(paidWei);
+
+            if (msg.value > paidWei) msg.sender.transfer(msg.value - paidWei);
+        } else if (now > icoStage.getEndTime()) {
+            msg.sender.transfer(msg.balance);
+            if (!icoStage.getIsEnd()) {
+                icoStage.endStage();
+                uint usdCollected = this.balance.mul(priceEthUSD.div(100));
+                if (usdCollected >= softCap) balances[factory] = icoTokensSold.div(10); // 10 percent of ico tokens sold
+                remainedBountyTokens = 0;
+                outOfTokens = true;
+                IcoEnded();
+            }
+        }
     }
 
     function calculateTokenPrice(uint centPrice) internal constant returns (uint weiPrice) {
         return (centPrice.mul(10 ** 18)).div(priceEthUSD);
     }
 
-    function updateBalances(Stage[4] stages, uint paidWei, bool isICO) internal {
-        uint currentPrice = stages[currentStage].price;
-        uint tokenWeiPrice = calculateTokenPrice(currentPrice);
-        uint currentStageRemain = stages[currentStage].remainedTokens;
-        uint amount = paidWei.div(tokenWeiPrice);
-        uint remainedTokensWeiPrice = (currentStageRemain.div(10 ** decimals)).mul(tokenWeiPrice);
-        amount *= 10 ** decimals;
-        if(weiBalances[msg.sender] == 0) investors.push(msg.sender);
-
-        if (currentStageRemain >= amount) {
-            balances[msg.sender] = balances[msg.sender].add(amount);
-            stages[currentStage].remainedTokens = currentStageRemain.sub(amount);
-            if (isICO) weiBalances[msg.sender] = weiBalances[msg.sender].add(paidWei);
-            updateStages(stages, isICO);
-            totalSupply = totalSupply.sub(amount);
-        } else if (currentStage == lastSubStage) {
-            balances[msg.sender] = balances[msg.sender].add(currentStageRemain);
-            stages[currentStage].remainedTokens = 0;
-            if (isICO) weiBalances[msg.sender] = weiBalances[msg.sender].add(remainedTokensWeiPrice);
-            updateStages(stages, isICO);
-            totalSupply = totalSupply.sub(currentStageRemain);
-            if (isICO) {
-              outOfTokens = true;
-              IcoIsEnded();
-            }
-            msg.sender.transfer(msg.value - weiBalances[msg.sender]);
-        } else {
-            uint debt = paidWei.sub(remainedTokensWeiPrice); // wei
-            balances[msg.sender] = balances[msg.sender].add(currentStageRemain);
-            if (isICO) weiBalances[msg.sender] = weiBalances[msg.sender].add(remainedTokensWeiPrice);
-            totalSupply = totalSupply.sub(currentStageRemain);
-            stages[currentStage].remainedTokens = 0;
-            updateStages(stages, isICO);
-            stages = updateCurrentStage(isICO);
-            updateBalances(stages, debt, isICO);
-        }
-    }
-    // needs because in Solidity isn't able get point to array
-    function updateStages(Stage[4] stages, bool isICO) internal {
-        if (isICO) for (uint8 i = 0; i <= lastSubStage; i++) icoStages[i] = stages[i];
-        else for (i = 0; i <= lastSubStage; i++) preIcoStages[i] = stages[i];
-    }
-
-    function updateCurrentStage(bool isICO) internal returns (Stage[4]){
-        Stage[4] memory stages;
-        if (isICO) stages = icoStages;
-        else stages = preIcoStages;
-
-        uint8 i = 0;
-        while(!(stages[i].endTime > now && stages[i].startTime <= now)) i++;
-        currentStage = i;
-        for (uint8 k = 0; k < i; k++) { // collect all tokens to currentStage
-          stages[currentStage].remainedTokens = stages[currentStage].remainedTokens.add(stages[k].remainedTokens);
-          stages[k].remainedTokens = 0;
-        }
-        if (stages[currentStage].remainedTokens <= 0) {
-          stages[currentStage].endTime = now;
-          currentStage += 1;
-          stages[currentStage].startTime = now;
-        }
-        return stages;
-    }
-
     function Crowdsale() public {
-        startTime = 1522713600;
-        totalSupply = initialSupply;
-        // PreICO 0-3
-        preIcoStages[0] = Stage(startTime, 1523318400, 44, 1000000 * (10 ** decimals));
-        preIcoStages[1] = Stage(1523318400, 1523923200, 47, 1000000 * (10 ** decimals));
-        preIcoStages[2] = Stage(1523923200, 1524528000, 50, 1000000 * (10 ** decimals));
-        preIcoStages[3] = Stage(1524528000, 1525046400, 52, 1000000 * (10 ** decimals));
-        // ICO 4-7
-        icoStages[0] = Stage(1525132800, 1525651200, 55, 10000000 * (10 ** decimals));
-        icoStages[1] = Stage(1525651200, 1526256000, 60, 20000000 * (10 ** decimals));
-        icoStages[2] = Stage(1526256000, 1526860800, 65, 30000000 * (10 ** decimals));
-        icoStages[3] = Stage(1526860800, 1527379200, 70, 30000000 * (10 ** decimals));
+        totalSupply = 0;
+        preIcoStage = new PreICO();
+        icoStage = new ICO();
         preSale();
     }
 
     function preSale() internal {
-      /*balances[0x00000] = 100;
-      investors.push(0x0000);*/
+      /*
+      balances[0x00000] = 100;
+      investors.push(0x0000);
+      whiteList[0x0000] = true;
+      */
     }
 
     function addMembersToWhiteList(address[] members) public onlyKyc_manager {
@@ -156,7 +294,7 @@ contract Crowdsale is SOL{
         }
     }
 
-    function setPriceEthUSD(uint newPrice) public onlyPrice_updater { // РІ С†РµРЅС‚Р°С…
+    function setPriceEthUSD(uint newPrice) public onlyPrice_updater { // cent
         priceEthUSD = newPrice;
     }
 
@@ -166,7 +304,7 @@ contract Crowdsale is SOL{
         investors.push(_to);
         balances[_to] = balances[_to].add(_amount);
         remainedBountyTokens = remainedBountyTokens.sub(_amount);
-        totalSupply = totalSupply.sub(_amount);
+        totalSupply = totalSupply.add(_amount);
     }
 
     function isInWhiteList(address member) internal constant returns(bool){
@@ -174,24 +312,11 @@ contract Crowdsale is SOL{
         return false;
     }
 
-    function burnPreIcoTokens() internal {
-        for(uint8 i = 0; i <= lastSubStage; i++) {
-            totalSupply = totalSupply.sub(preIcoStages[i].remainedTokens);
-            preIcoStages[i].remainedTokens = 0;
-        }
-    }
-
-    function burnAllRemainedTokens() internal {
-        for(uint8 i = 0; i <= lastSubStage; i++) {
-            totalSupply = totalSupply.sub(icoStages[i].remainedTokens);
-            icoStages[i].remainedTokens = 0;
-        }
-        remainedBountyTokens = 0;
-        outOfTokens = true;
-        IcoIsEnded();
-    }
-
     function sendToFactory() public onlyFactory {
+      if (!preIcoStage.getIsEnd()) {
+        factory.transfer(this.balance);
+        return;
+      }
       uint usdCollected = this.balance.mul(priceEthUSD.div(100));
       if (usdCollected < softCap) revert();
       factory.transfer(this.balance);
@@ -213,5 +338,18 @@ contract Crowdsale is SOL{
             returnFunds(investors[i]);
         }
         totalSupply = 0;
+    }
+
+
+    function buyout(uint _amount) public {
+      require(balances[msg.sender] >= _amount);
+      require(now > icoStage.endTime() + 2 years);
+      uint weiNeedReturn = TOKEN_BUYOUT_PRICE.mul(_amount).mul(10 ** 18).div(priceEthUSD);
+      uint realAmount = _amount;
+      if (weiNeedReturn > this.balance) {
+        realAmount = this.balance.mul(priceEthUSD).div(TOKEN_BUYOUT_PRICE).div(10 ** 18);
+      }
+      totalSupply = totalSupply.sub(realAmount);
+      balances[msg.sender] = balances[msg.sender].sub(realAmount);
     }
 }
