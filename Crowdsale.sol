@@ -2,7 +2,7 @@ pragma solidity ^0.4.19;
 
 import "./SOL.sol";
 
-
+//R delete this file
 contract Crowdsale is SOL{
     mapping(address => bool) whiteList;
     mapping(address => uint) weiBalances;

@@ -6,14 +6,17 @@ import "./ICOParams.sol";
 
 contract CrowdsaleStage is Access{
     using SafeMath for uint;
-    //R to private for more security FIXED
     uint internal startTime;
     uint internal endTime;
     uint8 internal currentStage;
+    //R public or private?
     uint decimals;
     Stage[4] internal stages;
     bool internal isEnd;
+
+    //R all constan to uperrcase http://solidity.readthedocs.io/en/develop/style-guide.html
     uint8 public constant lastSubStage = 3;
+
     struct Stage {
         uint startTime;
         uint endTime;
@@ -21,7 +24,6 @@ contract CrowdsaleStage is Access{
         uint remainedTokens;
     }
 
-    //R all public methods to onlyOwner
     function getStartTime() public constant onlyOwner returns (uint) {
         return startTime;
     }
@@ -34,6 +36,7 @@ contract CrowdsaleStage is Access{
     //     decimals = _decimals;
     // }
 
+    //R rename to getIsEnd or another for style guide support http://solidity.readthedocs.io/en/develop/style-guide.html
     function IsEnd() public constant onlyOwner returns (bool) {
         return isEnd;
     }
@@ -101,6 +104,7 @@ contract CrowdsaleStage is Access{
         //
         // Если now большое, то не попадём сюда, думаю лишнее будет, если мыз наем что этого не произойдёт
         //
+        // 
         while(!(stages[i].endTime > now && stages[i].startTime <= now)) i++;
 
         currentStage = i;
@@ -140,9 +144,6 @@ contract CrowdsaleStage is Access{
 
 
 contract PreICO is CrowdsaleStage {
-  //R аналогично с предидущем
-  //
-
   PreICOParams preIcoParams = new PreICOParams();
   function PreICO() public {
     currentStage = 0;
@@ -180,9 +181,6 @@ contract PreICO is CrowdsaleStage {
 
 
 contract ICO is CrowdsaleStage {
-  //R аналогично с предидущем
-  //
-
   ICOParams icoParams = new ICOParams();
   function ICO() public {
     currentStage = 0;
@@ -241,15 +239,7 @@ contract Crowdsale is SOL {
         uint paidWei;
         uint256 tokenBought;
 
-        //R можно в начало засунуть !preIcoStage.IsEnd() && - это теоретически ускорит процесс
-        //
-        // FIXED
         if (!preIcoStage.IsEnd() && now >= preIcoStage.getStartTime() && now < preIcoStage.getEndTime()) {
-
-            //R вообще здесь можно добавить вместо require if и в случай 0 - завершать этап
-            //
-            // Этапы завершаются автоматически в одном месте (updateBalances) если у нас 0, то этап уже завершён
-            //
             require(preIcoStage.howMuchCanBuy(priceEthUSD) > 0);
 
             paidWei = preIcoStage.howMuchCanBuy(priceEthUSD) >= msg.value ? msg.value : preIcoStage.howMuchCanBuy(priceEthUSD);
@@ -259,18 +249,12 @@ contract Crowdsale is SOL {
 
             if (msg.value > paidWei) msg.sender.transfer(msg.value - paidWei);
 
-        //R аналогично !icoStage.IsEnd() &&
-        //
-        // FIXED
         } else if (!icoStage.IsEnd() && now >= icoStage.getStartTime() && now < icoStage.getEndTime()) {
             if (!preIcoStage.IsEnd()) {
                 preIcoStage.endStage();
                 factory.transfer(this.balance);
             }
 
-            //R аналогично require заменить на if
-            //
-            // Ответ выше (223 строка)
             require(icoStage.howMuchCanBuy(priceEthUSD) > 0);
 
             paidWei = icoStage.howMuchCanBuy(priceEthUSD) >= msg.value ? msg.value : icoStage.howMuchCanBuy(priceEthUSD);
@@ -306,9 +290,6 @@ contract Crowdsale is SOL {
         preSale();
     }
 
-    //R всех из preSale надо сразу в whiteList
-    //
-    // Fixed
     function preSale() internal {
       /*
       balances[0x00000] = 100;
