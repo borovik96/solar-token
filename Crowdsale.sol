@@ -6,12 +6,13 @@ import "./ICOParams.sol";
 
 contract CrowdsaleStage is Access{
     using SafeMath for uint;
-    uint internal startTime;
-    uint internal endTime;
+    uint public startTime;
+    uint public endTime; // public for buyout function
     uint8 internal currentStage;
     uint public decimals;
     Stage[4] internal stages;
     bool internal isEnd;
+
 
     //R all constan to uperrcase http://solidity.readthedocs.io/en/develop/style-guide.html
     uint8 public constant LAST_SUB_STAGE = 3;
@@ -35,7 +36,7 @@ contract CrowdsaleStage is Access{
     }
 
     function isActive() public constant onlyOwner returns (bool) {
-      return (!isEnd && now >= startTime && now < endTime)
+      return (!isEnd && now >= startTime && now < endTime);
     }
 
     function howMuchCanBuy(uint priceEthUSD) public onlyOwner returns (uint256 weiAmount) {
@@ -124,7 +125,7 @@ contract PreICO is CrowdsaleStage {
   function PreICO() public {
     currentStage = 0;
     startTime = preIcoParams.START_TIME();
-    endTime = preIcoParams.endTime();
+    endTime = preIcoParams.END_TIME();
     isEnd = false;
     stages[0] = Stage(
       preIcoParams.START_TIME(),
@@ -205,7 +206,10 @@ contract Crowdsale is SOL {
     bool public outOfTokens = false;
     uint constant PANEL_PRICE = 600; // in tokens
     uint constant TOKEN_BUYOUT_PRICE = 110; // in cent
+
     event IcoEnded();
+    event Buyout(address sender, uint amount);
+    event BuyPanels(address buyer, uint countPanels);
 
     function () public payable {
         require(msg.value > 0);
@@ -235,7 +239,7 @@ contract Crowdsale is SOL {
             }
 
             if (icoStage.howMuchCanBuy(priceEthUSD) <= 0) {
-              isoStage.endStage();
+              icoStage.endStage();
               msg.sender.transfer(msg.value);
               return;
             }
@@ -251,7 +255,7 @@ contract Crowdsale is SOL {
 
             if (msg.value > paidWei) msg.sender.transfer(msg.value - paidWei);
         } else if (now > icoStage.getEndTime()) {
-            msg.sender.transfer(msg.balance);
+            msg.sender.transfer(msg.value);
             if (!icoStage.getIsEnd()) {
                 icoStage.endStage();
                 uint usdCollected = this.balance.mul(priceEthUSD.div(100));
@@ -351,5 +355,17 @@ contract Crowdsale is SOL {
       }
       totalSupply = totalSupply.sub(realAmount);
       balances[msg.sender] = balances[msg.sender].sub(realAmount);
+      Buyout(msg.sender, realAmount);
     }
+
+    function buyPanel(uint paidTokens) public {
+      require(balances[msg.sender] >= paidTokens);
+      require(now > icoStage.endTime() + 1 years);
+      uint countPanels = paidTokens.div(PANEL_PRICE);
+      uint payTokens = countPanels.mul(PANEL_PRICE);
+      totalSupply = totalSupply.sub(payTokens);
+      balances[msg.sender] = balances[msg.sender].sub(payTokens);
+      BuyPanels(msg.sender, countPanels);
+    }
+
 }
