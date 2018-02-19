@@ -259,7 +259,10 @@ contract Crowdsale is SOL {
             if (!icoStage.getIsEnd()) {
                 icoStage.endStage();
                 uint usdCollected = this.balance.mul(priceEthUSD.div(100));
-                if (usdCollected >= softCap) balances[factory] = icoTokensSold.div(10); // 10 percent of ico tokens sold
+                if (usdCollected >= softCap) {
+                  balances[factory] = icoTokensSold.div(10); // 10 percent of ico tokens sold
+                  totalSupply = totalSupply.add(icoTokensSold.div(10));
+                }
                 remainedBountyTokens = 0;
                 outOfTokens = true;
                 IcoEnded();
