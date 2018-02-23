@@ -201,6 +201,8 @@ contract Crowdsale is SOL {
     mapping(address => bool) whiteList;
     mapping(address => uint) weiBalances;
     address[] investors;
+
+    //R все парметры в конфиги надо вынести
     uint public remainedBountyTokens = 1893000;
     uint priceEthUSD = 120000;// cent
     uint startTime;
@@ -262,6 +264,8 @@ contract Crowdsale is SOL {
             weiBalances[msg.sender] = weiBalances[msg.sender].add(paidWei);
 
             if (msg.value > paidWei) msg.sender.transfer(msg.value - paidWei);
+
+        //R icoStage.getIsEnd() || now > icoStage.getEndTime()
         } else if (now > icoStage.getEndTime()) {
             msg.sender.transfer(msg.value);
             if (!icoStage.getIsEnd()) {
@@ -315,6 +319,7 @@ contract Crowdsale is SOL {
 
     function sendBountyTokens(address _to, uint _amount) public onlyBounty_manager {
         require(_amount <= remainedBountyTokens);
+        //R мне кажется должно быть  require(isInWhiteList(_to));
         require(isInWhiteList(msg.sender));
         investors.push(_to);
         balances[_to] = balances[_to].add(_amount);
@@ -348,6 +353,7 @@ contract Crowdsale is SOL {
         weiBalances[investor] = 0;
     }
 
+    //R нигде не юзается или я что-0то путаю?
     function returnAllFunds() public onlyOwner {
         for (uint i = 0; i < investors.length; i++) {
             returnFunds(investors[i]);
