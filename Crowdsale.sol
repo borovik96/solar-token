@@ -7,14 +7,13 @@ import "./ICOParams.sol";
 contract CrowdsaleStage is Access{
     using SafeMath for uint;
     uint public startTime;
-    uint public endTime; // public for buyout function
+    //R зачем если есть getStartTime()??
+    uint public endTime; // public for buyout function 
     uint8 internal currentStage;
     uint public decimals;
     Stage[4] internal stages;
     bool internal isEnd;
 
-
-    //R all constan to uperrcase http://solidity.readthedocs.io/en/develop/style-guide.html
     uint8 public constant LAST_SUB_STAGE = 3;
 
     struct Stage {
@@ -35,6 +34,7 @@ contract CrowdsaleStage is Access{
         return isEnd;
     }
 
+    //R нет проверки про деньги, что там вообще остались токены
     function isActive() public constant onlyOwner returns (bool) {
       return (!isEnd && now >= startTime && now < endTime);
     }
@@ -51,7 +51,11 @@ contract CrowdsaleStage is Access{
         return (weiAmount);
     }
 
-
+    // Предлагаю перерабоать данную функцию вместе с updateBalance
+    // предлагаю чтобы данная функция возвращала пару кол-во купленых токенов и их стоимость в эфире!
+    // разница между paidWei и стоимостью возвращается пользователю 
+    // таким образом можем полностью выпилить howMuchCanBuy и проверку этоого параметра во внешнем контракте
+    // кроме того факт того что токены закончились разумно учитывать в isActive
     function buyTokens(uint paidWei, uint priceEthUSD) public onlyOwner returns (uint256 tokensBought) {
       require(howMuchCanBuy(priceEthUSD) >= paidWei);
       tokensBought = updateBalances(paidWei, 0, priceEthUSD);
@@ -66,6 +70,7 @@ contract CrowdsaleStage is Access{
       uint amount = paidWei.div(tokenWeiPrice);
       uint remainedTokensWeiPrice = (currentStageRemain.div(10 ** decimals)).mul(tokenWeiPrice);
       amount *= 10 ** decimals;
+      //R надо обрабатывать ошибочные ситуации а не делать вид что их не будет amount > howMuchCanBuy
       if (currentStageRemain >= amount) {
           stages[currentStage].remainedTokens = currentStageRemain.sub(amount);
           if (currentStage == LAST_SUB_STAGE && currentStageRemain == amount) {
@@ -223,6 +228,9 @@ contract Crowdsale is SOL {
         uint256 tokenBought;
 
         if (preIcoStage.isActive()) {
+
+            //R логику проверки остатка средств предалагю так же засунуть внутрь функции buyTokens
+            //
             require(preIcoStage.howMuchCanBuy(priceEthUSD) > 0);
 
             paidWei = preIcoStage.howMuchCanBuy(priceEthUSD) >= msg.value ? msg.value : preIcoStage.howMuchCanBuy(priceEthUSD);

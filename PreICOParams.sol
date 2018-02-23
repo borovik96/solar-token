@@ -1,6 +1,6 @@
 pragma solidity ^0.4.19;
+
 contract PreICOParams {
-  //R all constan to uperrcase http://solidity.readthedocs.io/en/develop/style-guide.html
   uint public constant STAGE_1_END = 1523318400;
   uint public constant STAGE_2_END = 1523923200;
   uint public constant STAGE_3_END = 1524528000;
