@@ -3,6 +3,7 @@ pragma solidity ^0.4.19;
 import "./SOL.sol";
 import "./PreICOParams.sol";
 import "./ICOParams.sol";
+import "./CrowdsaleParams.sol";
 
 contract CrowdsaleStage is Access{
     using SafeMath for uint;
@@ -96,7 +97,7 @@ contract CrowdsaleStage is Access{
         }
     }
 
-    function calculateTokenPrice(uint centPrice, uint priceEthUSD) internal constant returns (uint weiPrice) {
+    function calculateTokenPrice(uint centPrice, uint priceEthUSD) internal pure returns (uint weiPrice) {
         return (centPrice.mul(10 ** 18)).div(priceEthUSD);
     }
 
@@ -195,17 +196,17 @@ contract Crowdsale is SOL {
     mapping(address => uint) weiBalances;
     address[] investors;
 
-    //R все парметры в конфиги надо вынести
-    uint public remainedBountyTokens = 1893000;
-    uint priceEthUSD = 120000;// cent
-    uint startTime;
-    uint icoTokensSold;
-    ICO icoStage;
-    PreICO preIcoStage;
-    uint public softCap = 100;// general
+    CrowdsaleParams params = new CrowdsaleParams();
+    uint public remainedBountyTokens = params.REMAINED_BOUNTY_TOKENS();
+    uint private priceEthUSD = params.PRICE_ETH_USD();// cent
+    uint private startTime;
+    uint private icoTokensSold;
+    ICO private icoStage;
+    PreICO private preIcoStage;
+    uint public softCap = params.SOFTCAP();// general
     bool public outOfTokens = false;
-    uint constant PANEL_PRICE = 600; // in tokens
-    uint constant TOKEN_BUYOUT_PRICE = 110; // in cent
+    uint constant PANEL_PRICE = params.PANEL_PRICE(); // in tokens
+    uint constant TOKEN_BUYOUT_PRICE = params.TOKEN_BUYOUT_PRICE(); // in cent
 
     event IcoEnded();
     event Buyout(address sender, uint amount);
