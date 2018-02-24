@@ -6,7 +6,6 @@ contract Access is Ownable {
     address bounty_manager = 0xca35b7d915458ef540ade6068dfe2f44e8fa733c; // change before deploy
     address kyc_manager = 0xca35b7d915458ef540ade6068dfe2f44e8fa733c; // change before deploy
     address factory;
-
     modifier onlyPrice_updater() {
         require(msg.sender == price_updater);
         _;

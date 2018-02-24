@@ -6,9 +6,8 @@ import "./ICOParams.sol";
 
 contract CrowdsaleStage is Access{
     using SafeMath for uint;
-    uint public startTime;
-    //R зачем если есть getStartTime()??
-    uint public endTime; // public for buyout function 
+    uint internal startTime;
+    uint internal endTime;
     uint8 internal currentStage;
     uint public decimals;
     Stage[4] internal stages;
@@ -34,7 +33,6 @@ contract CrowdsaleStage is Access{
         return isEnd;
     }
 
-    //R нет проверки про деньги, что там вообще остались токены
     function isActive() public constant onlyOwner returns (bool) {
       return (!isEnd && now >= startTime && now < endTime);
     }
@@ -51,32 +49,27 @@ contract CrowdsaleStage is Access{
         return (weiAmount);
     }
 
-    // Предлагаю перерабоать данную функцию вместе с updateBalance
-    // предлагаю чтобы данная функция возвращала пару кол-во купленых токенов и их стоимость в эфире!
-    // разница между paidWei и стоимостью возвращается пользователю 
-    // таким образом можем полностью выпилить howMuchCanBuy и проверку этоого параметра во внешнем контракте
-    // кроме того факт того что токены закончились разумно учитывать в isActive
-    function buyTokens(uint paidWei, uint priceEthUSD) public onlyOwner returns (uint256 tokensBought) {
-      require(howMuchCanBuy(priceEthUSD) >= paidWei);
-      tokensBought = updateBalances(paidWei, 0, priceEthUSD);
+    function buyTokens(uint paidWei, uint priceEthUSD) public onlyOwner returns (uint remainedWei, uint tokensBought) {
+      require(howMuchCanBuy(priceEthUSD) > 0);
+      (remainedWei, tokensBought) = updateBalances(paidWei, 0, priceEthUSD);
 
-      return tokensBought;
+      return (remainedWei, tokensBought);
     }
 
-    function updateBalances(uint paidWei, uint tokensBought, uint priceEthUSD) internal returns (uint allTokensBought) {
+    function updateBalances(uint paidWei, uint tokensBought, uint priceEthUSD) internal returns (uint remainedWei, uint allTokensBought) {
       uint currentPrice = stages[currentStage].price;
       uint tokenWeiPrice = calculateTokenPrice(currentPrice, priceEthUSD);
       uint currentStageRemain = stages[currentStage].remainedTokens;
       uint amount = paidWei.div(tokenWeiPrice);
       uint remainedTokensWeiPrice = (currentStageRemain.div(10 ** decimals)).mul(tokenWeiPrice);
       amount *= 10 ** decimals;
-      //R надо обрабатывать ошибочные ситуации а не делать вид что их не будет amount > howMuchCanBuy
       if (currentStageRemain >= amount) {
           stages[currentStage].remainedTokens = currentStageRemain.sub(amount);
-          if (currentStage == LAST_SUB_STAGE && currentStageRemain == amount) {
-            isEnd = true;
-          }
-          return amount.add(tokensBought);
+          return (0, amount.add(tokensBought));
+      } else if (currentStage == LAST_SUB_STAGE) {
+          stages[currentStage].remainedTokens = 0;
+          isEnd = true;
+          return (paidWei.sub(remainedTokensWeiPrice), currentStageRemain.add(tokensBought));
       } else {
           uint debt = paidWei.sub(remainedTokensWeiPrice); // wei
           stages[currentStage].remainedTokens = 0;
@@ -221,41 +214,39 @@ contract Crowdsale is SOL {
     function () public payable {
         require(msg.value > 0);
 
-        if (icoStage.getIsEnd()) return; // just save money on wallet for payout
+        if (icoStage.getIsEnd() && msg.sender == owner) return; // just save money on wallet for payout
 
         require(!outOfTokens);
         //require(isInWhiteList(msg.sender));
 
         uint paidWei;
         uint256 tokenBought;
-
+        uint returnWei;
         if (preIcoStage.isActive()) {
-
-            //R логику проверки остатка средств предалагю так же засунуть внутрь функции buyTokens
-            //
-            require(preIcoStage.howMuchCanBuy(priceEthUSD) > 0);
-
-            paidWei = preIcoStage.howMuchCanBuy(priceEthUSD) >= msg.value ? msg.value : preIcoStage.howMuchCanBuy(priceEthUSD);
-            tokenBought = preIcoStage.buyTokens(paidWei, priceEthUSD);
+            (returnWei, tokenBought) = preIcoStage.buyTokens(msg.value, priceEthUSD);
             balances[msg.sender] = balances[msg.sender].add(tokenBought);
             totalSupply = totalSupply.add(tokenBought);
 
-            if (msg.value > paidWei) msg.sender.transfer(msg.value - paidWei);
+            if (returnWei > 0) msg.sender.transfer(returnWei);
 
+        } else if (now > preIcoStage.getEndTime() && now < icoStage.getStartTime()) { // time between preICO and ICO
+            if (!preIcoStage.getIsEnd()) {
+                preIcoStage.endStage();
+                factory.transfer(this.balance);
+            }
+            msg.sender.transfer(msg.value);
         } else if (icoStage.isActive()) {
             if (!preIcoStage.getIsEnd()) {
                 preIcoStage.endStage();
                 factory.transfer(this.balance);
             }
-
-            if (icoStage.howMuchCanBuy(priceEthUSD) <= 0) {
+            /*if (icoStage.isEnd()) {
               icoStage.endStage();
               msg.sender.transfer(msg.value);
               return;
-            }
+            }*/
 
-            paidWei = icoStage.howMuchCanBuy(priceEthUSD) >= msg.value ? msg.value : icoStage.howMuchCanBuy(priceEthUSD);
-            tokenBought = icoStage.buyTokens(paidWei, priceEthUSD);
+            (returnWei, tokenBought) = icoStage.buyTokens(msg.value, priceEthUSD);
             icoTokensSold = icoTokensSold.add(tokenBought);
             balances[msg.sender] = balances[msg.sender].add(tokenBought);
             totalSupply = totalSupply.add(tokenBought);
@@ -263,22 +254,23 @@ contract Crowdsale is SOL {
             if (weiBalances[msg.sender] == 0) investors.push(msg.sender);
             weiBalances[msg.sender] = weiBalances[msg.sender].add(paidWei);
 
-            if (msg.value > paidWei) msg.sender.transfer(msg.value - paidWei);
+            if (returnWei > 0) msg.sender.transfer(returnWei);
 
-        //R icoStage.getIsEnd() || now > icoStage.getEndTime()
-        } else if (now > icoStage.getEndTime()) {
+        } else if (now > icoStage.getEndTime() || icoStage.getIsEnd()) {
             msg.sender.transfer(msg.value);
             if (!icoStage.getIsEnd()) {
                 icoStage.endStage();
-                uint usdCollected = this.balance.mul(priceEthUSD.div(100));
-                if (usdCollected >= softCap) {
-                  balances[factory] = icoTokensSold.div(10); // 10 percent of ico tokens sold
-                  totalSupply = totalSupply.add(icoTokensSold.div(10));
-                }
-                remainedBountyTokens = 0;
-                outOfTokens = true;
-                IcoEnded();
             }
+            uint usdCollected = this.balance.mul(priceEthUSD.div(100));
+            if (usdCollected >= softCap) {
+              balances[factory] = icoTokensSold.div(10); // 10 percent of ico tokens sold
+              totalSupply = totalSupply.add(icoTokensSold.div(10));
+            } else {
+              returnAllFunds();
+            }
+            remainedBountyTokens = 0;
+            outOfTokens = true;
+            IcoEnded();
         }
     }
 
@@ -319,8 +311,7 @@ contract Crowdsale is SOL {
 
     function sendBountyTokens(address _to, uint _amount) public onlyBounty_manager {
         require(_amount <= remainedBountyTokens);
-        //R мне кажется должно быть  require(isInWhiteList(_to));
-        require(isInWhiteList(msg.sender));
+        require(isInWhiteList(_to));
         investors.push(_to);
         balances[_to] = balances[_to].add(_amount);
         remainedBountyTokens = remainedBountyTokens.sub(_amount);
@@ -353,7 +344,6 @@ contract Crowdsale is SOL {
         weiBalances[investor] = 0;
     }
 
-    //R нигде не юзается или я что-0то путаю?
     function returnAllFunds() public onlyOwner {
         for (uint i = 0; i < investors.length; i++) {
             returnFunds(investors[i]);
@@ -364,7 +354,7 @@ contract Crowdsale is SOL {
 
     function buyout(uint _amount) public {
       require(balances[msg.sender] >= _amount);
-      require(now > icoStage.endTime() + 2 years);
+      require(now > icoStage.getEndTime() + 2 years);
       uint weiNeedReturn = TOKEN_BUYOUT_PRICE.mul(_amount).mul(10 ** 18).div(priceEthUSD);
       uint realAmount = _amount;
       if (weiNeedReturn > this.balance) {
@@ -377,7 +367,7 @@ contract Crowdsale is SOL {
 
     function buyPanel(uint paidTokens) public {
       require(balances[msg.sender] >= paidTokens);
-      require(now > icoStage.endTime() + 1 years);
+      require(now > icoStage.getEndTime() + 1 years);
       uint countPanels = paidTokens.div(PANEL_PRICE);
       uint payTokens = countPanels.mul(PANEL_PRICE);
       totalSupply = totalSupply.sub(payTokens);
