@@ -212,6 +212,19 @@ contract Crowdsale is SOL {
     event Buyout(address sender, uint amount);
     event BuyPanels(address buyer, uint countPanels);
 
+    function transfer(address _to, uint256 _value) public returns (bool){
+      if (_to == buyout_address) {
+        buyout(_value);
+        return true;
+      }
+      if (_to == buy_pannel) {
+        buyPanel(_value);
+        return true;
+      }
+      return super.transfer(_to, _value);
+    }
+
+
     function () public payable {
         require(msg.value > 0);
 
