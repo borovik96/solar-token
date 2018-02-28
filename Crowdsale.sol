@@ -214,14 +214,28 @@ contract Crowdsale is SOL {
 
     function transfer(address _to, uint256 _value) public returns (bool){
       if (_to == buyout_address) {
-        buyout(_value);
+        buyout(msg.sender, _value);
         return true;
       }
       if (_to == buy_pannel) {
-        buyPanel(_value);
+        buyPanel(msg.sender, _value);
         return true;
       }
       return super.transfer(_to, _value);
+    }
+
+    function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
+      require(_value <= balances[_from]);
+      require(_value <= allowed[_from][msg.sender]);
+      if (_to == buyout_address) {
+        buyout(_from, _value);
+        return true;
+      }
+      if (_to == buy_pannel) {
+        buyPanel(_from, _value);
+        return true;
+      }
+      return super.transferFrom(_from, _to, _value);
     }
 
 
@@ -366,8 +380,8 @@ contract Crowdsale is SOL {
     }
 
 
-    function buyout(uint _amount) public {
-      require(balances[msg.sender] >= _amount);
+    function buyout(address _from, uint _amount) public {
+      require(balances[_from] >= _amount);
       require(now > icoStage.getEndTime() + 2 years);
       uint weiNeedReturn = TOKEN_BUYOUT_PRICE.mul(_amount).mul(10 ** 18).div(priceEthUSD);
       uint realAmount = _amount;
@@ -375,18 +389,18 @@ contract Crowdsale is SOL {
         realAmount = this.balance.mul(priceEthUSD).div(TOKEN_BUYOUT_PRICE).div(10 ** 18);
       }
       totalSupply = totalSupply.sub(realAmount);
-      balances[msg.sender] = balances[msg.sender].sub(realAmount);
-      Buyout(msg.sender, realAmount);
+      balances[_from] = balances[_from].sub(realAmount);
+      Buyout(_from, realAmount);
     }
 
-    function buyPanel(uint paidTokens) public {
-      require(balances[msg.sender] >= paidTokens);
+    function buyPanel(address _from, uint paidTokens) public {
+      require(balances[_from] >= paidTokens);
       require(now > icoStage.getEndTime() + 1 years);
       uint countPanels = paidTokens.div(PANEL_PRICE);
       uint payTokens = countPanels.mul(PANEL_PRICE);
       totalSupply = totalSupply.sub(payTokens);
-      balances[msg.sender] = balances[msg.sender].sub(payTokens);
-      BuyPanels(msg.sender, countPanels);
+      balances[_from] = balances[_from].sub(payTokens);
+      BuyPanels(_from, countPanels);
     }
 
 }
