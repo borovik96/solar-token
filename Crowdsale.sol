@@ -38,20 +38,8 @@ contract CrowdsaleStage is Access{
       return (!isEnd && now >= startTime && now < endTime);
     }
 
-    function howMuchCanBuy(uint priceEthUSD) public onlyOwner returns (uint256 weiAmount) {
-        weiAmount = 0;
-        uint256 tokenPrice;
-        updateCurrentStage();
-        for (uint8 i = 0; i < stages.length; i++) {
-          tokenPrice = calculateTokenPrice(stages[i].price, priceEthUSD);
-          weiAmount = weiAmount.add(stages[i].remainedTokens.mul(tokenPrice).div(10 ** decimals));
-        }
-
-        return (weiAmount);
-    }
-
     function buyTokens(uint paidWei, uint priceEthUSD) public onlyOwner returns (uint remainedWei, uint tokensBought) {
-      require(howMuchCanBuy(priceEthUSD) > 0);
+      require(!getIsEnd());
       (remainedWei, tokensBought) = updateBalances(paidWei, 0, priceEthUSD);
 
       return (remainedWei, tokensBought);
@@ -197,20 +185,32 @@ contract Crowdsale is SOL {
     address[] investors;
 
     CrowdsaleParams params = new CrowdsaleParams();
-    uint public remainedBountyTokens = params.REMAINED_BOUNTY_TOKENS();
+    uint internal remainedBountyTokens = params.REMAINED_BOUNTY_TOKENS();
     uint private priceEthUSD = params.PRICE_ETH_USD();// cent
     uint private startTime;
     uint private icoTokensSold;
     ICO private icoStage;
     PreICO private preIcoStage;
-    uint public softCap = params.SOFTCAP();// general
-    bool public outOfTokens = false;
+    uint internal softCap = params.SOFTCAP();// general
+    bool internal outOfTokens = false;
     uint constant PANEL_PRICE = params.PANEL_PRICE(); // in tokens
     uint constant TOKEN_BUYOUT_PRICE = params.TOKEN_BUYOUT_PRICE(); // in cent
 
     event IcoEnded();
     event Buyout(address sender, uint amount);
     event BuyPanels(address buyer, uint countPanels);
+
+    function getRemainedBountyTokens() public constant returns (uint){
+      return remainedBountyTokens;
+    }
+
+    function getSoftCap() public constant returns (uint) {
+      return softCap;
+    }
+
+    function getOutOfTokens() public constant returns (bool) {
+      return outOfTokens;
+    }
 
     function transfer(address _to, uint256 _value) public returns (bool){
       if (_to == buyout_address) {
@@ -242,7 +242,7 @@ contract Crowdsale is SOL {
     function () public payable {
         require(msg.value > 0);
 
-        if (icoStage.getIsEnd() && msg.sender == owner) return; // just save money on wallet for payout
+        if (icoStage.getIsEnd() && msg.sender == factory) return; // just save money on wallet for payout
 
         require(!outOfTokens);
         //require(isInWhiteList(msg.sender));
