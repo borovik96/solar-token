@@ -10,7 +10,7 @@ contract CrowdsaleStage is Access{
     uint internal startTime;
     uint internal endTime;
     uint8 internal currentStage;
-    uint public decimals;
+    uint public decimals = 18; // hardcode because it's overhead pass as a prop
     Stage[4] internal stages;
     bool internal isEnd;
 
