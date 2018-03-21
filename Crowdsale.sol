@@ -318,6 +318,7 @@ contract Crowdsale is SOL {
       balances[0x00000] = 100;
       investors.push(0x0000);
       whiteList[0x0000] = true;
+      totalSupply = totalSupply.add(100);
       */
     }
 
