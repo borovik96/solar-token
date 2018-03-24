@@ -291,6 +291,7 @@ contract Crowdsale is SOL {
         }
     }
 
+    // R можно выпилить в данном контракте! нужна ток  в CrowdsaleStage
     function calculateTokenPrice(uint centPrice) internal constant returns (uint weiPrice) {
         return (centPrice.mul(10 ** 18)).div(priceEthUSD);
     }
