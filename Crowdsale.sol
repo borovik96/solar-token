@@ -4,6 +4,7 @@ import "./SOL.sol";
 import "./PreICOParams.sol";
 import "./ICOParams.sol";
 import "./CrowdsaleParams.sol";
+import "./StubToken.sol";
 
 contract CrowdsaleStage is Access{
     using SafeMath for uint;
@@ -193,6 +194,7 @@ contract Crowdsale is SOL {
     uint internal softCap = params.SOFTCAP();// general
     bool internal outOfTokens = false;
     uint constant PANEL_PRICE = params.PANEL_PRICE(); // in tokens
+    address newTokenAddress;
 
     event IcoEnded();
     event BuyPanels(address buyer, uint countPanels);
@@ -323,6 +325,10 @@ contract Crowdsale is SOL {
         priceEthUSD = newPrice;
     }
 
+    function setNewTokenAddress(address _newTokenAddress) public onlyOwner {
+        newTokenAddress = _newTokenAddress;
+    }
+
     function sendBountyTokens(address _to, uint _amount) public onlyBounty_manager {
         require(_amount <= remainedBountyTokens);
         require(isInWhiteList(_to));
@@ -376,6 +382,15 @@ contract Crowdsale is SOL {
       BuyPanels(_from, countPanels);
     }
 
-
+    function exchangeToNewToken(uint _amount) public {
+      require(newTokenAddress != 0);
+      require(balances[msg.sender] >= _amount);
+      StubToken token = StubToken(newTokenAddress);
+      bool success = token.exchangeOldToken(msg.sender, _amount);
+      if (success) {
+        balances[msg.sender] = balances[msg.sender].sub(_amount);
+        totalSupply = totalSupply.sub(_amount);
+      }
+    }
 
 }
