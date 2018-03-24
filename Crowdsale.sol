@@ -368,11 +368,14 @@ contract Crowdsale is SOL {
     function buyPanel(address _from, uint paidTokens) public {
       require(balances[_from] >= paidTokens);
       require(now > icoStage.getEndTime() + 1 years);
+      require(isInWhiteList(_from));
       uint countPanels = paidTokens.div(PANEL_PRICE);
       uint payTokens = countPanels.mul(PANEL_PRICE);
       totalSupply = totalSupply.sub(payTokens);
       balances[_from] = balances[_from].sub(payTokens);
       BuyPanels(_from, countPanels);
     }
+
+
 
 }
