@@ -49,9 +49,8 @@ contract CrowdsaleStage is Access{
       uint currentPrice = stages[currentStage].price;
       uint tokenWeiPrice = calculateTokenPrice(currentPrice, priceEthUSD);
       uint currentStageRemain = stages[currentStage].remainedTokens;
-      uint amount = paidWei.div(tokenWeiPrice);
+      uint amount = paidWei.div(tokenWeiPrice).mul(10 ** decimals);
       uint remainedTokensWeiPrice = (currentStageRemain.div(10 ** decimals)).mul(tokenWeiPrice);
-      amount *= 10 ** decimals;
       if (currentStageRemain >= amount) {
           stages[currentStage].remainedTokens = currentStageRemain.sub(amount);
           return (0, amount.add(tokensBought));
@@ -194,10 +193,8 @@ contract Crowdsale is SOL {
     uint internal softCap = params.SOFTCAP();// general
     bool internal outOfTokens = false;
     uint constant PANEL_PRICE = params.PANEL_PRICE(); // in tokens
-    uint constant TOKEN_BUYOUT_PRICE = params.TOKEN_BUYOUT_PRICE(); // in cent
 
     event IcoEnded();
-    event Buyout(address sender, uint amount);
     event BuyPanels(address buyer, uint countPanels);
 
     function getRemainedBountyTokens() public constant returns (uint){
@@ -213,10 +210,6 @@ contract Crowdsale is SOL {
     }
 
     function transfer(address _to, uint256 _value) public returns (bool){
-      if (_to == buyout_address) {
-        buyout(msg.sender, _value);
-        return true;
-      }
       if (_to == buy_pannel) {
         buyPanel(msg.sender, _value);
         return true;
@@ -227,10 +220,6 @@ contract Crowdsale is SOL {
     function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
       require(_value <= balances[_from]);
       require(_value <= allowed[_from][msg.sender]);
-      if (_to == buyout_address) {
-        buyout(_from, _value);
-        return true;
-      }
       if (_to == buy_pannel) {
         buyPanel(_from, _value);
         return true;
@@ -378,20 +367,6 @@ contract Crowdsale is SOL {
             returnFunds(investors[i]);
         }
         totalSupply = 0;
-    }
-
-
-    function buyout(address _from, uint _amount) public {
-      require(balances[_from] >= _amount);
-      require(now > icoStage.getEndTime() + 2 years);
-      uint weiNeedReturn = TOKEN_BUYOUT_PRICE.mul(_amount).mul(10 ** 18).div(priceEthUSD);
-      uint realAmount = _amount;
-      if (weiNeedReturn > this.balance) {
-        realAmount = this.balance.mul(priceEthUSD).div(TOKEN_BUYOUT_PRICE).div(10 ** 18);
-      }
-      totalSupply = totalSupply.sub(realAmount);
-      balances[_from] = balances[_from].sub(realAmount);
-      Buyout(_from, realAmount);
     }
 
     function buyPanel(address _from, uint paidTokens) public {
