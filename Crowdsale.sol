@@ -290,6 +290,8 @@ contract Crowdsale is SOL {
             remainedBountyTokens = 0;
             outOfTokens = true;
             IcoEnded();
+        } else {
+            msg.sender.transfer(msg.value);
         }
     }
 
