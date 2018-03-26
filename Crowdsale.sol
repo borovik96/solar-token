@@ -257,7 +257,7 @@ contract Crowdsale is SOL {
         } else if (icoStage.isActive()) {
             if (!preIcoStage.getIsEnd()) {
                 preIcoStage.endStage();
-                factory.transfer(this.balance);
+                factory.transfer(this.balance - msg.value); // send only preico money
             }
             /*if (icoStage.isEnd()) {
               icoStage.endStage();
