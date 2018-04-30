@@ -4,7 +4,7 @@ import "./Access.sol";
 
 contract SOL is StandardToken, Access {
 
-    string public constant name = "Simple Coin Token";
+    string public constant name = "Solar Token";
     string public constant symbol = "SOL";
     uint public constant decimals = 18;
 }
