@@ -1,21 +1,19 @@
 pragma solidity ^0.4.19;
 
 import "./SOL.sol";
+
 import "./StubToken.sol";
 
 /// @title Solar Token ICO.
 /// @author Borovik Valdimir, Zenin Mikhail
 
-contract CrowdsaleStage is Access{
-    using SafeMath for uint;
-    uint public decimals = 18; // hardcode because it's overhead pass as a prop
-
 contract Crowdsale is SOL {
-
+    using SafeMath for uint;
+    uint public _totalSupply;
     mapping(address => bool) whiteList;
     mapping(address => uint) weiBalances;
     address[] investors;
-    uint constant PANEL_PRICE = params.PANEL_PRICE(); // in tokens
+    uint constant PANEL_PRICE = 600; // in tokens SET BEFORE DEPLOY
     uint constant BUY_PANEL_START_TIME = 1000; // timestamp SET BEFORE DEPLOY
     uint constant SEND_TOKENS_TO_TEAM_TIME_1 = 1000; // timestamp SET BEFORE DEPLOY
     uint constant SEND_TOKENS_TO_TEAM_TIME_2 = SEND_TOKENS_TO_TEAM_TIME_1 + 1 years;
@@ -36,6 +34,10 @@ contract Crowdsale is SOL {
       return super.transfer(_to, _value);
     }
 
+    function totalSupply() public constant returns (uint) {
+       return _totalSupply  - balances[address(0)];
+   }
+
     /// @dev overloaded transferFrom function form erc20, serves for the purchase of panels
     /// @param _from sender's address
     /// @param _to address of the recipient
@@ -53,7 +55,6 @@ contract Crowdsale is SOL {
 
     /// @dev contract constructor, initializes total supply and stages of ICO, launches presale
     function Crowdsale() public {
-        totalSupply = 0;
         preSale();
     }
 
@@ -63,7 +64,7 @@ contract Crowdsale is SOL {
       balances[0x00000] = 100;
       investors.push(0x0000);
       whiteList[0x0000] = true;
-      totalSupply = totalSupply.add(100);
+      _totalSupply = _totalSupply.add(100);
       */
     }
 

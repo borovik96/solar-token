@@ -1,5 +1,5 @@
 pragma solidity ^0.4.18;
-import "./Token.sol";
+import "./Ownable.sol";
 
 contract Access is Ownable {
     address kyc_manager = 0xca35b7d915458ef540ade6068dfe2f44e8fa733c; // change before deploy
