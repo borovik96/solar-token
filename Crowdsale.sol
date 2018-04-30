@@ -1,9 +1,6 @@
 pragma solidity ^0.4.19;
 
 import "./SOL.sol";
-import "./PreICOParams.sol";
-import "./ICOParams.sol";
-import "./CrowdsaleParams.sol";
 import "./StubToken.sol";
 
 /// @title Solar Token ICO.
@@ -11,233 +8,18 @@ import "./StubToken.sol";
 
 contract CrowdsaleStage is Access{
     using SafeMath for uint;
-    uint internal startTime;
-    uint internal endTime;
-    uint8 internal currentStage;
     uint public decimals = 18; // hardcode because it's overhead pass as a prop
-    Stage[4] internal stages;
-    bool internal isEnd;
-
-    uint8 public constant LAST_SUB_STAGE = 3;
-
-    struct Stage {
-        uint startTime;
-        uint endTime;
-        uint price;
-        uint remainedTokens;
-    }
-
-    /// @dev Getting start time of stage
-    function getStartTime() public constant onlyOwner returns (uint) {
-        return startTime;
-    }
-
-    /// @dev Getting end time of stage
-    function getEndTime() public constant onlyOwner returns (uint) {
-        return endTime;
-    }
-
-    /// @dev Checking end of stage
-    function getIsEnd() public constant onlyOwner returns (bool) {
-        return isEnd;
-    }
-
-    /// @dev Stage activity check
-    function isActive() public constant onlyOwner returns (bool) {
-      return (!isEnd && now >= startTime && now < endTime);
-    }
-
-    /// @dev Buying tokens
-    /// @param paidWei payed wei
-    /// @param priceEthUSD price ETH in cents
-    /// @return Returns remained wei and how much tokens bought.
-    function buyTokens(uint paidWei, uint priceEthUSD) public onlyOwner returns (uint remainedWei, uint tokensBought) {
-      require(!getIsEnd());
-      (remainedWei, tokensBought) = updateBalances(paidWei, 0, priceEthUSD);
-
-      return (remainedWei, tokensBought);
-    }
-
-    /// @dev Updating balances for each stage
-    /// @param paidWei payed wei
-    /// @param priceEthUSD price ETH in cents
-    /// @return Returns remained wei and how much user can buy tokens.
-    function updateBalances(uint paidWei, uint tokensBought, uint priceEthUSD) internal returns (uint remainedWei, uint allTokensBought) {
-      uint currentPrice = stages[currentStage].price;
-      uint tokenWeiPrice = calculateTokenPrice(currentPrice, priceEthUSD);
-      uint currentStageRemain = stages[currentStage].remainedTokens;
-      uint amount = paidWei.div(tokenWeiPrice).mul(10 ** decimals);
-      uint remainedTokensWeiPrice = (currentStageRemain.div(10 ** decimals)).mul(tokenWeiPrice);
-      if (currentStageRemain >= amount) {
-          stages[currentStage].remainedTokens = currentStageRemain.sub(amount);
-          return (0, amount.add(tokensBought));
-      } else if (currentStage == LAST_SUB_STAGE) {
-          stages[currentStage].remainedTokens = 0;
-          isEnd = true;
-          return (paidWei.sub(remainedTokensWeiPrice), currentStageRemain.add(tokensBought));
-      } else {
-          uint debt = paidWei.sub(remainedTokensWeiPrice); // wei
-          stages[currentStage].remainedTokens = 0;
-          updateCurrentStage();
-          return updateBalances(debt, currentStageRemain.add(tokensBought), priceEthUSD);
-      }
-    }
-
-
-    /// @dev Updating current stage and remained tokens for each stage
-    function updateCurrentStage() internal {
-        uint8 i = 0;
-        while(!(stages[i].endTime > now && stages[i].startTime <= now)) i++;
-
-        currentStage = i;
-
-        for (uint8 k = 0; k < i; k++) { // collect all tokens to currentStage
-          stages[currentStage].remainedTokens = stages[currentStage].remainedTokens.add(stages[k].remainedTokens);
-          stages[k].remainedTokens = 0;
-        }
-
-        if (stages[currentStage].remainedTokens <= 0) {
-          stages[currentStage].endTime = now;
-          currentStage += 1;
-          stages[currentStage].startTime = now;
-        }
-    }
-
-    /// @dev Calculating token price in wei
-    /// @param centPrice price token in cents
-    /// @param priceEthUSD price ETH in cents
-    /// @return Returns price token in wei
-    function calculateTokenPrice(uint centPrice, uint priceEthUSD) internal pure returns (uint weiPrice) {
-        return (centPrice.mul(10 ** 18)).div(priceEthUSD);
-    }
-
-    /// @dev Completion of the stage
-    /// @return Returns how much tokens was burned
-    function endStage() public returns (uint burntTokens) {
-        isEnd = true;
-        return burnAllRemainedTokens();
-    }
-
-    /// @dev Burning all remained tokens on all stages
-    /// @return Returns how much tokens was burned
-    function burnAllRemainedTokens() private returns (uint burntTokens) {
-        burntTokens = 0;
-        for(uint8 i = 0; i < stages.length; i++) {
-          burntTokens = burntTokens.add(stages[i].remainedTokens);
-          stages[i].remainedTokens = 0;
-        }
-        return burntTokens;
-    }
-
-}
-
-
-
-contract PreICO is CrowdsaleStage {
-  PreICOParams preIcoParams = new PreICOParams();
-
-  /// @dev Setting all default params
-  function PreICO() public {
-    currentStage = 0;
-    startTime = preIcoParams.START_TIME();
-    endTime = preIcoParams.END_TIME();
-    isEnd = false;
-    stages[0] = Stage(
-      preIcoParams.START_TIME(),
-      preIcoParams.STAGE_1_END(),
-      preIcoParams.STAGE_1_PRICE(),
-      preIcoParams.STAGE_1_SUPPLY().mul(10 ** decimals)
-    );
-    stages[1] = Stage(
-      preIcoParams.STAGE_1_END(),
-      preIcoParams.STAGE_2_END(),
-      preIcoParams.STAGE_2_PRICE(),
-      preIcoParams.STAGE_2_SUPPLY().mul(10 ** decimals)
-    );
-    stages[2] = Stage(
-      preIcoParams.STAGE_2_END(),
-      preIcoParams.STAGE_3_END(),
-      preIcoParams.STAGE_3_PRICE(),
-      preIcoParams.STAGE_3_SUPPLY().mul(10 ** decimals)
-    );
-    stages[3] = Stage(
-      preIcoParams.STAGE_3_END(),
-      preIcoParams.END_TIME(),
-      preIcoParams.STAGE_4_PRICE(),
-      preIcoParams.STAGE_4_SUPPLY().mul(10 ** decimals)
-    );
-  }
-}
-
-
-
-
-contract ICO is CrowdsaleStage {
-  ICOParams icoParams = new ICOParams();
-
-  /// @dev Setting all default params
-  function ICO() public {
-    currentStage = 0;
-    startTime = icoParams.START_TIME();
-    endTime = icoParams.END_TIME();
-    isEnd = false;
-    stages[0] = Stage(
-      icoParams.START_TIME(),
-      icoParams.STAGE_1_END(),
-      icoParams.STAGE_1_PRICE(),
-      icoParams.STAGE_1_SUPPLY().mul(10 ** decimals)
-    );
-    stages[1] = Stage(
-      icoParams.STAGE_1_END(),
-      icoParams.STAGE_2_END(),
-      icoParams.STAGE_2_PRICE(),
-      icoParams.STAGE_2_SUPPLY().mul(10 ** decimals)
-    );
-    stages[2] = Stage(
-      icoParams.STAGE_2_END(),
-      icoParams.STAGE_3_END(),
-      icoParams.STAGE_3_PRICE(),
-      icoParams.STAGE_3_SUPPLY().mul(10 ** decimals)
-    );
-    stages[3] = Stage(
-      icoParams.STAGE_3_END(),
-      icoParams.END_TIME(),
-      icoParams.STAGE_4_PRICE(),
-      icoParams.STAGE_4_SUPPLY().mul(10 ** decimals)
-    );
-  }
-}
 
 contract Crowdsale is SOL {
 
     mapping(address => bool) whiteList;
     mapping(address => uint) weiBalances;
     address[] investors;
-
-    CrowdsaleParams params = new CrowdsaleParams();
-    uint private priceEthUSD = params.PRICE_ETH_USD();// cent
-    uint private startTime;
-    uint private icoTokensSold;
-    ICO private icoStage;
-    PreICO private preIcoStage;
-    uint internal softCap = params.SOFTCAP();// general
-    bool internal outOfTokens = false;
     uint constant PANEL_PRICE = params.PANEL_PRICE(); // in tokens
+    uint constant BUY_PANEL_START_TIME = 1000; // timestamp SET BEFORE DEPLOY
     address newTokenAddress;
 
-    event IcoEnded();
     event BuyPanels(address buyer, uint countPanels);
-
-    /// @dev Get soft cap of ICO
-    /// @return Returns ICO's soft cap
-    function getSoftCap() public constant returns (uint) {
-      return softCap;
-    }
-    /// @dev checking remaining tokens
-    /// @return Returns true/false, false - tokens did not end, true - no tokens
-    function getOutOfTokens() public constant returns (bool) {
-      return outOfTokens;
-    }
 
     /// @dev overloaded transfer function form erc20, serves for the purchase of panels
     /// @param _to address of the recipient
@@ -266,74 +48,9 @@ contract Crowdsale is SOL {
       return super.transferFrom(_from, _to, _value);
     }
 
-    /// @dev fallback function, processes purchase of tokens
-    function () public payable {
-        require(msg.value > 0);
-
-        if (icoStage.getIsEnd() && msg.sender == factory) return; // just save money on wallet for payout
-
-        require(!outOfTokens);
-        require(isInWhiteList(msg.sender));
-
-        uint paidWei;
-        uint256 tokenBought;
-        uint returnWei;
-        if (preIcoStage.isActive()) {
-            (returnWei, tokenBought) = preIcoStage.buyTokens(msg.value, priceEthUSD);
-            balances[msg.sender] = balances[msg.sender].add(tokenBought);
-            totalSupply = totalSupply.add(tokenBought);
-
-            if (returnWei > 0) msg.sender.transfer(returnWei);
-
-        } else if (now > preIcoStage.getEndTime() && now < icoStage.getStartTime()) { // time between preICO and ICO
-            if (!preIcoStage.getIsEnd()) {
-                preIcoStage.endStage();
-                factory.transfer(this.balance);
-            }
-            msg.sender.transfer(msg.value);
-        } else if (icoStage.isActive()) {
-            if (!preIcoStage.getIsEnd()) {
-                preIcoStage.endStage();
-                factory.transfer(this.balance);
-            }
-            /*if (icoStage.isEnd()) {
-              icoStage.endStage();
-              msg.sender.transfer(msg.value);
-              return;
-            }*/
-
-            (returnWei, tokenBought) = icoStage.buyTokens(msg.value, priceEthUSD);
-            icoTokensSold = icoTokensSold.add(tokenBought);
-            balances[msg.sender] = balances[msg.sender].add(tokenBought);
-            totalSupply = totalSupply.add(tokenBought);
-
-            if (weiBalances[msg.sender] == 0) investors.push(msg.sender);
-            weiBalances[msg.sender] = weiBalances[msg.sender].add(paidWei);
-
-            if (returnWei > 0) msg.sender.transfer(returnWei);
-
-        } else if (now > icoStage.getEndTime() || icoStage.getIsEnd()) {
-            msg.sender.transfer(msg.value);
-            if (!icoStage.getIsEnd()) {
-                icoStage.endStage();
-            }
-            uint usdCollected = this.balance.mul(priceEthUSD.div(100));
-            if (usdCollected >= softCap) {
-              balances[factory] = icoTokensSold.div(10); // 10 percent of ico tokens sold
-              totalSupply = totalSupply.add(icoTokensSold.div(10));
-            }
-            outOfTokens = true;
-            IcoEnded();
-        } else {
-            msg.sender.transfer(msg.value);
-        }
-    }
-
     /// @dev contract constructor, initializes total supply and stages of ICO, launches presale
     function Crowdsale() public {
         totalSupply = 0;
-        preIcoStage = new PreICO();
-        icoStage = new ICO();
         preSale();
     }
 
@@ -377,38 +94,12 @@ contract Crowdsale is SOL {
         return false;
     }
 
-    /// @dev Sending all funds to factory if preICO is end and assembled soft cap
-    function sendToFactory() public onlyFactory {
-      if (!preIcoStage.getIsEnd()) {
-        factory.transfer(this.balance);
-        return;
-      }
-      uint usdCollected = this.balance.mul(priceEthUSD.div(100));
-      if (usdCollected < softCap) revert();
-      factory.transfer(this.balance);
-    }
-
-    /// @dev Getting balance of Crowdsale contract
-    /// @return Returns Crowdsale's balance
-    function getBalance() public constant returns(uint) {
-        return this.balance;
-    }
-
-    /// @dev Returning funds to investor
-    /// @param investor investor's address
-    function returnFunds(address investor) public onlyOwner {
-        require(balances[investor] != 0);
-        investor.transfer(weiBalances[investor]);
-        balances[investor] = 0;
-        weiBalances[investor] = 0;
-    }
-
     /// @dev Purchasing panel for tokens
     /// @param _from buyer's address
     /// @param paidTokens amount of tokens
     function buyPanel(address _from, uint paidTokens) public {
       require(balances[_from] >= paidTokens);
-      require(now > icoStage.getEndTime() + 1 years);
+      require(now >= BUY_PANEL_START_TIME);
       require(isInWhiteList(_from));
       uint countPanels = paidTokens.div(PANEL_PRICE);
       uint payTokens = countPanels.mul(PANEL_PRICE);
