@@ -321,8 +321,6 @@ contract Crowdsale is SOL {
             if (usdCollected >= softCap) {
               balances[factory] = icoTokensSold.div(10); // 10 percent of ico tokens sold
               totalSupply = totalSupply.add(icoTokensSold.div(10));
-            } else {
-              returnAllFunds();
             }
             outOfTokens = true;
             IcoEnded();
@@ -403,16 +401,6 @@ contract Crowdsale is SOL {
         investor.transfer(weiBalances[investor]);
         balances[investor] = 0;
         weiBalances[investor] = 0;
-    }
-
-    /// @dev Returning funds to all investors and burning all SOL tokens
-    function returnAllFunds() public onlyOwner {
-        for (uint i = 0; i < investors.length; i++) {
-            returnFunds(investors[i]);
-            balances[investors[i]] = 0;
-            weiBalances[investors[i]] = 0;
-        }
-        totalSupply = 0;
     }
 
     /// @dev Purchasing panel for tokens
