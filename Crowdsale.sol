@@ -215,7 +215,6 @@ contract Crowdsale is SOL {
     address[] investors;
 
     CrowdsaleParams params = new CrowdsaleParams();
-    uint internal remainedBountyTokens = params.REMAINED_BOUNTY_TOKENS();
     uint private priceEthUSD = params.PRICE_ETH_USD();// cent
     uint private startTime;
     uint private icoTokensSold;
@@ -228,12 +227,6 @@ contract Crowdsale is SOL {
 
     event IcoEnded();
     event BuyPanels(address buyer, uint countPanels);
-
-    /// @dev Get remained bounty tokens
-    /// @return Returns amount of remained bounty tokens
-    function getRemainedBountyTokens() public constant returns (uint){
-      return remainedBountyTokens;
-    }
 
     /// @dev Get soft cap of ICO
     /// @return Returns ICO's soft cap
@@ -331,7 +324,6 @@ contract Crowdsale is SOL {
             } else {
               returnAllFunds();
             }
-            remainedBountyTokens = 0;
             outOfTokens = true;
             IcoEnded();
         } else {
@@ -373,28 +365,10 @@ contract Crowdsale is SOL {
         }
     }
 
-    /// @dev Setting ETH price in cents
-    /// @param newPrice New ETH price in cents
-    function setPriceEthUSD(uint newPrice) public onlyPrice_updater { // cent
-        priceEthUSD = newPrice;
-    }
-
     /// @dev Setting new token address for exchange in futher
     /// @param _newTokenAddress new token address
     function setNewTokenAddress(address _newTokenAddress) public onlyOwner {
         newTokenAddress = _newTokenAddress;
-    }
-
-    /// @dev Sending bounty tokens
-    /// @param _to address of the recipient
-    /// @param _amount amount of bounty tokens
-    function sendBountyTokens(address _to, uint _amount) public onlyBounty_manager {
-        require(_amount <= remainedBountyTokens);
-        require(isInWhiteList(_to));
-        investors.push(_to);
-        balances[_to] = balances[_to].add(_amount);
-        remainedBountyTokens = remainedBountyTokens.sub(_amount);
-        totalSupply = totalSupply.add(_amount);
     }
 
     /// @dev Finding member in whitelist
