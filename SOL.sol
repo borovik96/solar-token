@@ -1,5 +1,5 @@
 pragma solidity ^0.4.18;
-import "./Token.sol";
+import "./StandardToken.sol";
 import "./Access.sol";
 
 contract SOL is StandardToken, Access {
