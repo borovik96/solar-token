@@ -17,6 +17,9 @@ contract Crowdsale is SOL {
     address[] investors;
     uint constant PANEL_PRICE = params.PANEL_PRICE(); // in tokens
     uint constant BUY_PANEL_START_TIME = 1000; // timestamp SET BEFORE DEPLOY
+    uint constant SEND_TOKENS_TO_TEAM_TIME_1 = 1000; // timestamp SET BEFORE DEPLOY
+    uint constant SEND_TOKENS_TO_TEAM_TIME_2 = SEND_TOKENS_TO_TEAM_TIME_1 + 1 years;
+    uint constant TEAM_BONUS = 1000; // in tokens SET BEFORE DEPLOY
     address newTokenAddress;
 
     event BuyPanels(address buyer, uint countPanels);
@@ -119,6 +122,29 @@ contract Crowdsale is SOL {
         balances[msg.sender] = balances[msg.sender].sub(_amount);
         totalSupply = totalSupply.sub(_amount);
       }
+    }
+
+
+    bool isFirstPartTeamsTokensSended = false;
+    bool isSecondPartTeamsTokensSended = false;
+    /// @dev Sending tokens to team
+    function sendTokenToTeam() public onlyOwner {
+      require(now >= SEND_TOKENS_TO_TEAM_TIME_1);
+      if (!isFirstPartTeamsTokensSended) {
+        balances[factory] = balances[factory].add(TEAM_BONUS);
+        isFirstPartTeamsTokensSended = true;
+      }
+      if (now >= SEND_TOKENS_TO_TEAM_TIME_2 && !isSecondPartTeamsTokensSended) {
+        balances[factory] = balances[factory].add(TEAM_BONUS);
+        isSecondPartTeamsTokensSended = true;
+      }
+    }
+
+    /// @dev check that tokens for team ready
+    /// @return Returns true - if tokens ready, false - if not
+    function isTokensForTeamReady() public constant returns (bool) {
+      return (now >= SEND_TOKENS_TO_TEAM_TIME_1 && !isFirstPartTeamsTokensSended) ||
+             (now >= SEND_TOKENS_TO_TEAM_TIME_2 && !isSecondPartTeamsTokensSended);
     }
 
 }
