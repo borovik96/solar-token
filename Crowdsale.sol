@@ -12,6 +12,7 @@ contract Crowdsale is SOL {
     uint public _totalSupply;
     mapping(address => bool) whiteList;
     mapping(address => uint) weiBalances;
+    // R not used now
     address[] investors;
     uint constant PANEL_PRICE = 600; // in tokens SET BEFORE DEPLOY
     uint constant BUY_PANEL_START_TIME = 1000; // timestamp SET BEFORE DEPLOY
@@ -35,7 +36,7 @@ contract Crowdsale is SOL {
     }
 
     function totalSupply() public constant returns (uint) {
-       return _totalSupply  - balances[address(0)];
+       return _totalSupply - balances[address(0)];
    }
 
     /// @dev overloaded transferFrom function form erc20, serves for the purchase of panels
@@ -76,6 +77,7 @@ contract Crowdsale is SOL {
         }
     }
 
+    // R rename to deleteMembersFromWhiteList
     /// @dev Deleting members from white list
     /// @param members - array of members for delete
     function deleteMembersToWhiteList(address[] members) public onlyKyc_manager {
