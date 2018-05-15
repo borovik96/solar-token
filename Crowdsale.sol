@@ -11,8 +11,6 @@ contract Crowdsale is SOL {
     using SafeMath for uint;
     uint public _totalSupply;
     mapping(address => bool) whiteList;
-    // R not used now
-    address[] investors;
     uint constant PANEL_PRICE = 600; // in tokens SET BEFORE DEPLOY
     uint constant BUY_PANEL_START_TIME = 1000; // timestamp SET BEFORE DEPLOY
     uint constant SEND_TOKENS_TO_TEAM_TIME_1 = 1000; // timestamp SET BEFORE DEPLOY
