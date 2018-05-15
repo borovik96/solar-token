@@ -107,7 +107,7 @@ contract Crowdsale is SOL {
       require(isInWhiteList(_from));
       uint countPanels = paidTokens.div(PANEL_PRICE);
       uint payTokens = countPanels.mul(PANEL_PRICE);
-      totalSupply = totalSupply.sub(payTokens);
+      _totalSupply = _totalSupply.sub(payTokens);
       balances[_from] = balances[_from].sub(payTokens);
       BuyPanels(_from, countPanels);
     }
@@ -121,7 +121,7 @@ contract Crowdsale is SOL {
       bool success = token.exchangeOldToken(msg.sender, _amount);
       if (success) {
         balances[msg.sender] = balances[msg.sender].sub(_amount);
-        totalSupply = totalSupply.sub(_amount);
+        _totalSupply = _totalSupply.sub(_amount);
       }
     }
 
