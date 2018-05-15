@@ -11,7 +11,6 @@ contract Crowdsale is SOL {
     using SafeMath for uint;
     uint public _totalSupply;
     mapping(address => bool) whiteList;
-    mapping(address => uint) weiBalances;
     // R not used now
     address[] investors;
     uint constant PANEL_PRICE = 600; // in tokens SET BEFORE DEPLOY
@@ -77,10 +76,9 @@ contract Crowdsale is SOL {
         }
     }
 
-    // R rename to deleteMembersFromWhiteList
     /// @dev Deleting members from white list
     /// @param members - array of members for delete
-    function deleteMembersToWhiteList(address[] members) public onlyKyc_manager {
+    function deleteMembersFromWhiteList(address[] members) public onlyKyc_manager {
         for(uint i = 0; i < members.length; i++) {
             whiteList[members[i]] = false;
         }
