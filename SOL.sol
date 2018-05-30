@@ -1,8 +1,8 @@
 pragma solidity ^0.4.18;
-import "./StandardToken.sol";
+import "./MintableToken.sol";
 import "./Access.sol";
 
-contract SOL is StandardToken, Access {
+contract SOL is MintableToken, Access {
 
     string public constant name = "Solar Token";
     string public constant symbol = "SOL";
